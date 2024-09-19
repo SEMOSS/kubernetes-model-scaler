@@ -2,12 +2,13 @@ from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
 from kazoo.client import KazooClient
 from fastapi import HTTPException
-from config import ZK_HOSTS, DOCKER_IMAGE, NAMESPACE
+from config import ZK_HOSTS, DOCKER_IMAGE, NAMESPACE, IMAGE_PULL_SECRET
 
 class KubernetesModelDeployer:
     def __init__(self, namespace=NAMESPACE, zookeeper_hosts=ZK_HOSTS):
         self.namespace = namespace
         self.zookeeper_hosts = zookeeper_hosts
+        self.image_pull_secret = image_pull_secret
         config.load_kube_config()
         self.kazoo_client = KazooClient(hosts=self.zookeeper_hosts)
         self.kazoo_client.start()
@@ -22,8 +23,12 @@ class KubernetesModelDeployer:
 
         template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(labels={"model-id": model_id, "model-name": model_name}),
-            spec=client.V1PodSpec(containers=[container])
+            spec=client.V1PodSpec(
+                containers=[container],
+                image_pull_secrets=[client.V1LocalObjectReference(name=self.image_pull_secret)] if self.image_pull_secret else None
+            )
         )
+
 
         spec = client.V1DeploymentSpec(
             replicas=1,
