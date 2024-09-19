@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-deployer
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: model-deployer
+  template:
+    metadata:
+      labels:
+        app: model-deployer
+    spec:
+      serviceAccountName: model-deployer
+      containers:
+      - name: model-deployer
+        image: your-docker-image  # Replace with your actual image
+        ports:
+        - containerPort: 8000
+        env:
+        - name: ZK_HOSTS
+          value: "127.0.0.1:2181"  # Replace with your Zookeeper hosts
+        - name: DOCKER_IMAGE
+          value: "your-docker-image"  # Replace with your actual image
+        - name: NAMESPACE
+          value: "default"
