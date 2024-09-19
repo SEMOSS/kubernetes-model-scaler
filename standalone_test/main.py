@@ -114,7 +114,7 @@ class KubernetesModelDeployer:
         cluster_ip = self.get_service_cluster_ip(model_name)
         if cluster_ip:
             path = f"/models/{model_id}"
-            self.kazoo_client.ensure_path("/models")
+            self.kazoo_client.ensure_path(path)
             self.kazoo_client.set(path, cluster_ip.encode('utf-8'))
             print(f"Zookeeper updated at {path} with value {cluster_ip}")
 
