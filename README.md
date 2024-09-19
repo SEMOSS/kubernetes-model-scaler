@@ -1,0 +1,1 @@
+# kubernetes-model-scaler
