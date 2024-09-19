@@ -12,7 +12,7 @@ NAMESPACE = os.getenv('NAMESPACE', 'default')
 IMAGE_PULL_SECRET = os.getenv('IMAGE_PULL_SECRET', None)
 
 class KubernetesModelDeployer:
-    def __init__(self, namespace=NAMESPACE, zookeeper_hosts=ZK_HOSTS):
+    def __init__(self, namespace=NAMESPACE, zookeeper_hosts=ZK_HOSTS, image_pull_secret=IMAGE_PULL_SECRET):
         self.namespace = namespace
         self.zookeeper_hosts = zookeeper_hosts
         self.image_pull_secret = image_pull_secret
