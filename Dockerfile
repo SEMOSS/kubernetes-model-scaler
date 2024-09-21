@@ -1,8 +1,8 @@
 FROM python:3.11-slim
 
 # Set environment variables for improved performance in containerized Python applications
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
