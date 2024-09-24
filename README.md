@@ -12,7 +12,7 @@ docker build -t model-scaler .
 ```
 
 ```bash
-docker run -p 8000:8000 --name model-scaler model-scaler
+docker run -p 8000:8000 -e DOCKER_IMAGE=docker-image-name -e IMAGE_PULL_SECRET=image-pull-secret -e ZK_HOSTS=zk-hosts -e NAMESPACE=namespace  --name model-scaler model-scaler
 ```
 
 ## Access API Documentation

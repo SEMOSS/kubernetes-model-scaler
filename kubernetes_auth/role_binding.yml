@@ -1,13 +1,12 @@
-#RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: model-deployer-rolebinding
-  namespace: default
+  namespace: semoss
 subjects:
 - kind: ServiceAccount
   name: model-deployer
-  namespace: default
+  namespace: semoss
 roleRef:
   kind: Role
   name: model-deployer-role
