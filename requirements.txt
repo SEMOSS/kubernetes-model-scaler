@@ -3,3 +3,4 @@ uvicorn
 kubernetes
 kazoo
 pydantic
+python-dotenv
