@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 ZK_HOSTS = os.getenv("ZK_HOSTS", None)
 DOCKER_IMAGE = os.getenv("DOCKER_IMAGE", None)

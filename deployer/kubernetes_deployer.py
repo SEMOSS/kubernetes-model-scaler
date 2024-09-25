@@ -9,24 +9,43 @@ logger = logging.getLogger(__name__)
 
 
 class KubernetesModelDeployer:
-    def __init__(self, namespace=NAMESPACE, zookeeper_hosts=ZK_HOSTS):
+    def __init__(
+        self,
+        namespace=NAMESPACE,
+        zookeeper_hosts=ZK_HOSTS,
+        image_pull_secret=IMAGE_PULL_SECRET,
+    ):
         self.namespace = namespace
         self.zookeeper_hosts = zookeeper_hosts
-        self.image_pull_secret = IMAGE_PULL_SECRET
+        self.image_pull_secret = image_pull_secret
         config.load_kube_config()
         self.kazoo_client = KazooClient(hosts=self.zookeeper_hosts)
         self.kazoo_client.start()
 
-    def create_deployment(self, model_repo_name: str, model_id: str, model_name: str):
+    def create_deployment(
+        self, model_repo_name: str, model_id: str, model_name: str, pvc_name: str
+    ):
         """
         Creates a Kubernetes Deployment for the given model, setting up the necessary container specifications and environment variables.
         """
+
+        volume = client.V1Volume(
+            name="model-storage",
+            persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                claim_name=pvc_name
+            ),
+        )
+
+        volume_mount = client.V1VolumeMount(
+            name="model-storage", mount_path="/app/model_files"
+        )
 
         container = client.V1Container(
             name=model_name,
             image=DOCKER_IMAGE,  # Use the image from the config
             env=[client.V1EnvVar(name="MODEL_REPO_NAME", value=model_repo_name)],
-            ports=[client.V1ContainerPort(container_port=80)],
+            ports=[client.V1ContainerPort(container_port=8888)],
+            volume_mounts=[volume_mount],
         )
 
         template = client.V1PodTemplateSpec(
@@ -35,6 +54,7 @@ class KubernetesModelDeployer:
             ),
             spec=client.V1PodSpec(
                 containers=[container],
+                volumes=[volume],
                 image_pull_secrets=(
                     [client.V1LocalObjectReference(name=self.image_pull_secret)]
                     if self.image_pull_secret
@@ -66,6 +86,45 @@ class KubernetesModelDeployer:
             logger.error("Exception when creating deployment: %s\n" % e)
             raise HTTPException(status_code=500, detail="Failed to create deployment")
 
+    def create_pvc(self, pvc_name, storage_size="50Gi"):
+        """
+        Checks for an existing Persistent Volume Claim (PVC) with the given name. If it doesn't exist, creates a new PVC with the specified storage size.
+        """
+        api_instance = client.CoreV1Api()
+
+        # check if the PVC already exists
+        try:
+            existing_pvc = api_instance.read_namespaced_persistent_volume_claim(
+                name=pvc_name, namespace=self.namespace
+            )
+            logger.info(f"PVC '{pvc_name}' already exists. Using the existing PVC.")
+            return existing_pvc
+        except ApiException as e:
+            if e.status != 404:  # If error is not "Not Found"
+                logger.error(f"Exception when checking for existing PVC: {e}\n")
+                # raise
+
+        # If PVC doesn't exist create a new one
+        pvc = client.V1PersistentVolumeClaim(
+            metadata=client.V1ObjectMeta(name=pvc_name),
+            spec=client.V1PersistentVolumeClaimSpec(
+                access_modes=["ReadWriteOnce"],
+                resources=client.V1ResourceRequirements(
+                    requests={"storage": storage_size}
+                ),
+            ),
+        )
+
+        try:
+            api_response = api_instance.create_namespaced_persistent_volume_claim(
+                namespace=self.namespace, body=pvc
+            )
+            print(f"PVC created. status='{str(api_response.status)}'")
+            return api_response
+        except ApiException as e:
+            print(f"Exception when creating PVC: {e}\n")
+            raise
+
     def create_service(self, model_id: str, model_name: str):
         """
         Creates a Kubernetes Service to expose the Deployment internally within the cluster.
@@ -76,7 +135,7 @@ class KubernetesModelDeployer:
             metadata=client.V1ObjectMeta(name=model_name),
             spec=client.V1ServiceSpec(
                 selector={"model-id": model_id, "model-name": model_name},
-                ports=[client.V1ServicePort(port=80, target_port=80)],
+                ports=[client.V1ServicePort(port=8888, target_port=8888)],
                 type="ClusterIP",
             ),
         )
