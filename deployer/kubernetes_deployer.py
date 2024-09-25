@@ -46,6 +46,18 @@ class KubernetesModelDeployer:
             env=[client.V1EnvVar(name="MODEL_REPO_NAME", value=model_repo_name)],
             ports=[client.V1ContainerPort(container_port=8888)],
             volume_mounts=[volume_mount],
+            resources=client.V1ResourceRequirements(
+                limits={
+                    "nvidia.com/gpu": "1",
+                    "cpu": "4",
+                    "memory": "16Gi",
+                },
+                requests={
+                    "nvidia.com/gpu": "1",
+                    "cpu": "4",
+                    "memory": "16Gi",
+                },
+            ),
         )
 
         template = client.V1PodTemplateSpec(
@@ -60,6 +72,7 @@ class KubernetesModelDeployer:
                     if self.image_pull_secret
                     else None
                 ),
+                node_selector={"cloud.google.com/gke-accelerator": "nvidia-tesla-t4"},
             ),
         )
 

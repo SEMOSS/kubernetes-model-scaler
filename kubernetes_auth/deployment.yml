@@ -1,34 +1,34 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: remote-client-server
-  labels:
-    app: remote-client-server
-  namespace: semoss
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: remote-client-server
-  template:
-    metadata:
-      labels:
-        app: remote-client-server
-    spec:
-      serviceAccountName: model-deployer
-      containers:
-      - name: remote-client-server
-        image: "$(DOCKER_IMAGE)"
-        ports:
-        - containerPort: 8888
-        env:
-        - name: ZK_HOSTS
-          value: "10.55.3.210:2181"
-        - name: DOCKER_IMAGE
-          value: "$(DOCKER_IMAGE)"
-        - name: NAMESPACE
-          value: "semoss"
-        - name: IMAGE_PULL_SECRET
-          value: "$(IMAGE_PULL_SECRET)"
-      imagePullSecrets:
-      - name: $(IMAGE_PULL_SECRET)
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: remote-client-server
+#   labels:
+#     app: remote-client-server
+#   namespace: semoss
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: remote-client-server
+#   template:
+#     metadata:
+#       labels:
+#         app: remote-client-server
+#     spec:
+#       serviceAccountName: model-deployer
+#       containers:
+#       - name: remote-client-server
+#         image: "$(DOCKER_IMAGE)"
+#         ports:
+#         - containerPort: 8888
+#         env:
+#         - name: ZK_HOSTS
+#           value: "10.55.3.210:2181"
+#         - name: DOCKER_IMAGE
+#           value: "$(DOCKER_IMAGE)"
+#         - name: NAMESPACE
+#           value: "semoss"
+#         - name: IMAGE_PULL_SECRET
+#           value: "$(IMAGE_PULL_SECRET)"
+#       imagePullSecrets:
+#       - name: $(IMAGE_PULL_SECRET)
