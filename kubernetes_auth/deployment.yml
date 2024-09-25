@@ -20,10 +20,10 @@ spec:
       - name: remote-client-server
         image: "$(DOCKER_IMAGE)"
         ports:
-        - containerPort: 8000
+        - containerPort: 8888
         env:
         - name: ZK_HOSTS
-          value: "127.0.0.1:2181"
+          value: "10.55.3.210:2181"
         - name: DOCKER_IMAGE
           value: "$(DOCKER_IMAGE)"
         - name: NAMESPACE

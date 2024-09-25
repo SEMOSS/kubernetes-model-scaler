@@ -30,12 +30,23 @@ class KubernetesModelDeployer:
         self.kazoo_client = KazooClient(hosts=self.zookeeper_hosts)
         self.kazoo_client.start()
 
-    def create_deployment(self, model_repo_name, model_id, model_name):
+    def create_deployment(self, model_repo_name, model_id, model_name, pvc_name):
+        volume = client.V1Volume(
+            name="model-storage",
+            persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                claim_name=pvc_name
+            ),
+        )
+
+        volume_mount = client.V1VolumeMount(
+            name="model-storage", mount_path="/app/model_files"
+        )
         container = client.V1Container(
             name=model_name,
-            image=DOCKER_IMAGE,  # Use the image from the config
+            image=DOCKER_IMAGE,
             env=[client.V1EnvVar(name="MODEL_REPO_NAME", value=model_repo_name)],
             ports=[client.V1ContainerPort(container_port=80)],
+            volume_mounts=[volume_mount],
         )
 
         template = client.V1PodTemplateSpec(
@@ -44,6 +55,7 @@ class KubernetesModelDeployer:
             ),
             spec=client.V1PodSpec(
                 containers=[container],
+                volumes=[volume],
                 image_pull_secrets=(
                     [client.V1LocalObjectReference(name=self.image_pull_secret)]
                     if self.image_pull_secret
@@ -73,6 +85,42 @@ class KubernetesModelDeployer:
             print("Deployment created. status='%s'" % str(api_response.status))
         except ApiException as e:
             print("Exception when creating deployment: %s\n" % e)
+            raise
+
+    def create_pvc(self, pvc_name, storage_size="50Gi"):
+        api_instance = client.CoreV1Api()
+
+        # check if the PVC already exists
+        try:
+            existing_pvc = api_instance.read_namespaced_persistent_volume_claim(
+                name=pvc_name, namespace=self.namespace
+            )
+            print(f"PVC '{pvc_name}' already exists. Using the existing PVC.")
+            return existing_pvc
+        except ApiException as e:
+            if e.status != 404:  # If error is not "Not Found"
+                print(f"Exception when checking for existing PVC: {e}\n")
+                raise
+
+        # If PVC doesn't exist create a new one
+        pvc = client.V1PersistentVolumeClaim(
+            metadata=client.V1ObjectMeta(name=pvc_name),
+            spec=client.V1PersistentVolumeClaimSpec(
+                access_modes=["ReadWriteOnce"],
+                resources=client.V1ResourceRequirements(
+                    requests={"storage": storage_size}
+                ),
+            ),
+        )
+
+        try:
+            api_response = api_instance.create_namespaced_persistent_volume_claim(
+                namespace=self.namespace, body=pvc
+            )
+            print(f"PVC created. status='{str(api_response.status)}'")
+            return api_response
+        except ApiException as e:
+            print(f"Exception when creating PVC: {e}\n")
             raise
 
     def create_service(self, model_id, model_name):
@@ -145,18 +193,23 @@ class KubernetesModelDeployer:
 
 
 def main():
-    model_repo_name = "PixArt-alpha/PixArt-Sigma-XL-2-1024-MS"
+    model_repo_name = "PixArt-alpha/PixArt-XL-2-1024-MS"
     model_id = "3a3c3b49-8ce4-4e66-bf42-204c3cbbfcb0"
-    model_name = "pixartkunal"
+    model_name = "pixart"
+    pvc_name = f"{model_name}-pvc"
 
     deployer = KubernetesModelDeployer()
-    deployer.create_deployment(model_repo_name, model_id, model_name)
-    deployer.create_service(model_id, model_name)
-    if deployer.watch_deployment(model_name):
-        deployer.update_zookeeper(model_id, model_name)
-        print("Model deployed and registered successfully")
+    pvc = deployer.create_pvc(pvc_name)
+    if pvc:
+        deployer.create_deployment(model_repo_name, model_id, model_name, pvc_name)
+        deployer.create_service(model_id, model_name)
+        if deployer.watch_deployment(model_name):
+            deployer.update_zookeeper(model_id, model_name)
+            print("Model deployed and registered successfully")
+        else:
+            print("Model deployment failed")
     else:
-        print("Model deployment failed")
+        print("Failed to create or find PVC")
 
 
 if __name__ == "__main__":
