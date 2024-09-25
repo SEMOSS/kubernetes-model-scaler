@@ -45,7 +45,7 @@ class KubernetesModelDeployer:
             name=model_name,
             image=DOCKER_IMAGE,
             env=[client.V1EnvVar(name="MODEL_REPO_NAME", value=model_repo_name)],
-            ports=[client.V1ContainerPort(container_port=80)],
+            ports=[client.V1ContainerPort(container_port=8888)],
             volume_mounts=[volume_mount],
         )
 
@@ -130,7 +130,7 @@ class KubernetesModelDeployer:
             metadata=client.V1ObjectMeta(name=model_name),
             spec=client.V1ServiceSpec(
                 selector={"model-id": model_id, "model-name": model_name},
-                ports=[client.V1ServicePort(port=80, target_port=80)],
+                ports=[client.V1ServicePort(port=8888, target_port=8888)],
                 type="ClusterIP",
             ),
         )
