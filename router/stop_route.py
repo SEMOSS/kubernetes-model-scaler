@@ -18,7 +18,8 @@ def stop_model(model_id: str):
     deployer = KubernetesModelDeployer()
     # TODO: Implement get_model_name_from_id
     try:
-        model_name = deployer.get_model_name_from_id(model_id)
+        # model_name = deployer.get_model_name_from_id(model_id)
+        model_name = model_id
     except Exception as e:
         logger.error(f"Error mapping model name from id for {model_id}: {e}")
         raise HTTPException(
