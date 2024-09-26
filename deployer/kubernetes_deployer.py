@@ -2,7 +2,7 @@ from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
 from kazoo.client import KazooClient
 from fastapi import HTTPException
-from config.config import ZK_HOSTS, DOCKER_IMAGE, NAMESPACE, IMAGE_PULL_SECRET
+from config.config import ZK_HOSTS, DOCKER_IMAGE, NAMESPACE, IMAGE_PULL_SECRET, DEV
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,11 +14,18 @@ class KubernetesModelDeployer:
         namespace=NAMESPACE,
         zookeeper_hosts=ZK_HOSTS,
         image_pull_secret=IMAGE_PULL_SECRET,
+        dev=DEV,
     ):
+        logger.info(
+            f"Initializing KubernetesModelDeployer with namespace={namespace}, zookeeper_hosts={zookeeper_hosts}, image_pull_secret={image_pull_secret}"
+        )
         self.namespace = namespace
         self.zookeeper_hosts = zookeeper_hosts
         self.image_pull_secret = image_pull_secret
-        config.load_kube_config()
+        if dev == "true":
+            config.load_kube_config()
+        else:
+            config.load_incluster_config()
         self.kazoo_client = KazooClient(hosts=self.zookeeper_hosts)
         self.kazoo_client.start()
 
@@ -216,7 +223,8 @@ class KubernetesModelDeployer:
         cluster_ip = self.get_service_cluster_ip(model_name)
         if cluster_ip:
             path = f"/models/{model_id}"
-            self.kazoo_client.ensure_path("/models")
+            # self.kazoo_client.ensure_path("/models")
+            self.kazoo_client.ensure_path(path)
             self.kazoo_client.set(path, cluster_ip.encode("utf-8"))
             logger.info(f"Zookeeper updated at {path} with value {cluster_ip}")
 
