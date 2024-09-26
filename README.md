@@ -2,9 +2,8 @@
 
 
 ## Running the Server Locally
-- Running with the dev flag will pull the environment variables from the .env file.
 ```bash
-python main.py --dev
+python main.py
 ```
 
 ## Docker

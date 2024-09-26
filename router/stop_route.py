@@ -8,48 +8,38 @@ stop_router = APIRouter()
 
 
 @stop_router.post("/stop")
-def stop_model(model_id: str):
+def stop_model(model_id: str = None, model_name: str = None):
     """
-    1. Maps the model_id to a model_name.
-    2. Deletes the deployment.
-    3. Deletes the service.
-    4. Removes the model's entry from Zookeeper.
+    Stops the model deployment by deleting the Kubernetes deployment, service, and zookeeper entry.
+    Accepts either model_id or model_name to identify the model.
     """
     deployer = KubernetesModelDeployer()
-    # TODO: Implement get_model_name_from_id
-    try:
-        # model_name = deployer.get_model_name_from_id(model_id)
-        model_name = model_id
-    except Exception as e:
-        logger.error(f"Error mapping model name from id for {model_id}: {e}")
+
+    if not model_id and not model_name:
         raise HTTPException(
-            status_code=500, detail=f"Failed to get model name for {model_id}"
+            status_code=400, detail="Either model_id or model_name must be provided"
+        )
+
+    # Retrieve model_name and model_id if one is missing
+    try:
+        if model_id and not model_name:
+            model_name = deployer.get_model_name_from_id(model_id)
+        elif model_name and not model_id:
+            model_id = deployer.get_model_id_from_name(model_name)
+    except Exception as e:
+        logger.error(f"Error retrieving model_id or model_name: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve model information: {e}"
         )
 
     try:
         deployer.delete_deployment(model_name)
-    except Exception as e:
-        logger.error(f"Error deleting deployment for {model_name}/{model_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete deployment for {model_name}/{model_id}",
-        )
-
-    try:
         deployer.delete_service(model_name)
-    except Exception as e:
-        logger.error(f"Error deleting service for {model_name}/{model_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete service for {model_name}/{model_id}",
-        )
-
-    try:
         deployer.remove_zookeeper(model_id)
     except Exception as e:
-        logger.error(f"Error removing Zookeeper entry for {model_name}/{model_id}: {e}")
+        logger.error(f"Error stopping model {model_name}/{model_id}: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to remove Zookeeper entry for {model_name}/{model_id}",
+            status_code=500, detail=f"Failed to stop model {model_name}/{model_id}"
         )
+
     return {"status": "Model deployment stopped and unregistered successfully"}

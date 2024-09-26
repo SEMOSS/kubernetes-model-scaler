@@ -49,7 +49,7 @@ class KubernetesModelDeployer:
 
         container = client.V1Container(
             name=model_name,
-            image=DOCKER_IMAGE,  # Use the image from the config
+            image=DOCKER_IMAGE,
             env=[client.V1EnvVar(name="MODEL_REPO_NAME", value=model_repo_name)],
             ports=[client.V1ContainerPort(container_port=8888)],
             volume_mounts=[volume_mount],
@@ -264,3 +264,49 @@ class KubernetesModelDeployer:
         if self.kazoo_client.exists(path):
             self.kazoo_client.delete(path)
             logger.info(f"Zookeeper entry {path} deleted.")
+
+    def get_model_name_from_id(self, model_id: str) -> str:
+        """
+        Given a model_id, retrieve the model_name by querying Kubernetes deployments labeled with model-id.
+        """
+        api_instance = client.AppsV1Api()
+        try:
+            deployments = api_instance.list_namespaced_deployment(
+                namespace=self.namespace, label_selector=f"model-id={model_id}"
+            )
+            if deployments.items:
+                # Assume only one deployment per model id??
+                deployment = deployments.items[0]
+                model_name = deployment.metadata.labels.get("model-name")
+                return model_name
+            else:
+                logger.error(f"No deployments found with model-id {model_id}")
+                raise Exception(f"No deployments found with model-id {model_id}")
+        except ApiException as e:
+            logger.error("Exception when listing deployments: %s\n" % e)
+            raise HTTPException(
+                status_code=500, detail="Failed to get model name from model id"
+            )
+
+    def get_model_id_from_name(self, model_name: str) -> str:
+        """
+        Given a model_name, retrieve the model_id by querying Kubernetes deployments labeled with model-name.
+        """
+        api_instance = client.AppsV1Api()
+        try:
+            deployments = api_instance.list_namespaced_deployment(
+                namespace=self.namespace, label_selector=f"model-name={model_name}"
+            )
+            if deployments.items:
+                # Assume only one deployment per model name??
+                deployment = deployments.items[0]
+                model_id = deployment.metadata.labels.get("model-id")
+                return model_id
+            else:
+                logger.error(f"No deployments found with model-name {model_name}")
+                raise Exception(f"No deployments found with model-name {model_name}")
+        except ApiException as e:
+            logger.error("Exception when listing deployments: %s\n" % e)
+            raise HTTPException(
+                status_code=500, detail="Failed to get model id from model name"
+            )
