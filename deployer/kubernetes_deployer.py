@@ -67,10 +67,10 @@ class KubernetesModelDeployer:
             ),
         )
 
+        labels = {"model-id": model_id, "model-name": model_name}
+
         template = client.V1PodTemplateSpec(
-            metadata=client.V1ObjectMeta(
-                labels={"model-id": model_id, "model-name": model_name}
-            ),
+            metadata=client.V1ObjectMeta(labels=labels),
             spec=client.V1PodSpec(
                 containers=[container],
                 volumes=[volume],
@@ -97,7 +97,7 @@ class KubernetesModelDeployer:
         deployment = client.V1Deployment(
             api_version="apps/v1",
             kind="Deployment",
-            metadata=client.V1ObjectMeta(name=model_name),
+            metadata=client.V1ObjectMeta(name=model_name, labels=labels),
             spec=spec,
         )
 
