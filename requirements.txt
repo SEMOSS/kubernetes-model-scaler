@@ -1,7 +1,7 @@
-fastapi
-uvicorn
-kubernetes
-kazoo
-pydantic
-python-dotenv
-nbstripout
+fastapi==0.115.0
+uvicorn==0.30.6
+kubernetes==31.0.0
+kazoo==2.10.0
+pydantic==2.9.2
+python-dotenv==1.0.1
+nbstripout==0.7.1
