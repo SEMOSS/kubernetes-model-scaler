@@ -80,6 +80,11 @@ class KubernetesModelDeployer:
                     else None
                 ),
                 node_selector={"cloud.google.com/gke-accelerator": "nvidia-tesla-t4"},
+                tolerations=[
+                    client.V1Toleration(
+                        key="nvidia.com/gpu", operator="Exists", effect="NoSchedule"
+                    )
+                ],
             ),
         )
 
@@ -106,13 +111,14 @@ class KubernetesModelDeployer:
             logger.error("Exception when creating deployment: %s\n" % e)
             raise HTTPException(status_code=500, detail="Failed to create deployment")
 
-    def create_pvc(self, pvc_name, storage_size="50Gi"):
+    def create_pvc(self, storage_size="500Gi"):
         """
         Checks for an existing Persistent Volume Claim (PVC) with the given name. If it doesn't exist, creates a new PVC with the specified storage size.
         """
         api_instance = client.CoreV1Api()
 
         # check if the PVC already exists
+        pvc_name = "filestore-cfg-pv-rwm"
         try:
             existing_pvc = api_instance.read_namespaced_persistent_volume_claim(
                 name=pvc_name, namespace=self.namespace
@@ -128,7 +134,7 @@ class KubernetesModelDeployer:
         pvc = client.V1PersistentVolumeClaim(
             metadata=client.V1ObjectMeta(name=pvc_name),
             spec=client.V1PersistentVolumeClaimSpec(
-                access_modes=["ReadWriteOnce"],
+                access_modes=["ReadWriteMany"],
                 resources=client.V1ResourceRequirements(
                     requests={"storage": storage_size}
                 ),

@@ -23,7 +23,7 @@ def start_model(request: ModelRequest):
     # Create or find an existing persistent volume claim (PVC) for the model
     try:
         pvc_name = f"{request.model_name}-pvc"
-        pvc = deployer.create_pvc(pvc_name)
+        deployer.create_pvc()
     except Exception as e:
         logger.error(f"Error finding or creating PVC for {request.model_name}: {e}")
         raise HTTPException(
