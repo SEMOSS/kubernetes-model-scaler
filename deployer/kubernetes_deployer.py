@@ -111,6 +111,79 @@ class KubernetesModelDeployer:
             logger.error("Exception when creating deployment: %s\n" % e)
             raise HTTPException(status_code=500, detail="Failed to create deployment")
 
+    def create_podmonitoring(self, model_id: str, model_name: str):
+        """
+        Creates a PodMonitoring resource for the deployed model to enable metrics scraping by GMP.
+        """
+        custom_api = client.CustomObjectsApi()
+        body = {
+            "apiVersion": "monitoring.googleapis.com/v1",
+            "kind": "PodMonitoring",
+            "metadata": {
+                "name": f"{model_name}-pod-monitoring",
+                "namespace": self.namespace,
+            },
+            "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "model-name": model_name,
+                        # "model-id": model_id,
+                    }
+                },
+                "endpoints": [
+                    {
+                        "port": 8888,
+                        "interval": "15s",
+                    }
+                ],
+                "targetLabels": {"metadata": ["pod", "container"]},
+            },
+        }
+
+        try:
+            custom_api.create_namespaced_custom_object(
+                group="monitoring.googleapis.com",
+                version="v1",
+                namespace=self.namespace,
+                plural="podmonitorings",
+                body=body,
+            )
+            logger.info(f"PodMonitoring '{model_name}-pod-monitoring' created.")
+        except ApiException as e:
+            if e.status == 409:
+                logger.info(
+                    f"PodMonitoring '{model_name}-pod-monitoring' already exists."
+                )
+            else:
+                logger.error(f"Exception when creating PodMonitoring: {e}\n")
+                raise HTTPException(
+                    status_code=500, detail="Failed to create PodMonitoring"
+                )
+
+    def delete_podmonitoring(self, model_name: str):
+        """
+        Deletes the PodMonitoring resource associated with the model.
+        """
+        custom_api = client.CustomObjectsApi()
+        try:
+            custom_api.delete_namespaced_custom_object(
+                group="monitoring.googleapis.com",
+                version="v1",
+                namespace=self.namespace,
+                plural="podmonitorings",
+                name=f"{model_name}-pod-monitoring",
+                body=client.V1DeleteOptions(),
+            )
+            logger.info(f"PodMonitoring '{model_name}-pod-monitoring' deleted.")
+        except ApiException as e:
+            if e.status == 404:
+                logger.info(f"PodMonitoring '{model_name}-pod-monitoring' not found.")
+            else:
+                logger.error(f"Exception when deleting PodMonitoring: {e}\n")
+                raise HTTPException(
+                    status_code=500, detail="Failed to delete PodMonitoring"
+                )
+
     def create_pvc(self, storage_size="500Gi"):
         """
         Checks for an existing Persistent Volume Claim (PVC) with the given name. If it doesn't exist, creates a new PVC with the specified storage size.
