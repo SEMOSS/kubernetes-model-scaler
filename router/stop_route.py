@@ -37,6 +37,7 @@ def stop_model(model_id: str = None, model_name: str = None):
         deployer.delete_service(model_name)
         deployer.remove_zookeeper(model_id)
         deployer.delete_podmonitoring(model_name)
+        deployer.delete_hpa(model_name)
     except Exception as e:
         logger.error(f"Error stopping model {model_name}/{model_id}: {e}")
         raise HTTPException(

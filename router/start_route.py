@@ -61,6 +61,15 @@ def start_model(request: ModelRequest):
             detail=f"Model pod monitoring creation failed for {request.model_name}",
         )
 
+    try:
+        deployer.create_hpa(request.model_name)
+    except Exception as e:
+        logger.error(f"Error creating HPA for {request.model_name}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Model HPA creation failed for {request.model_name}",
+        )
+
     # Update Zookeeper with the model's ClusterIP
     if deployer.watch_deployment(request.model_name):
         deployer.update_zookeeper(request.model_id, request.model_name)

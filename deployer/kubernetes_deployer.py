@@ -184,6 +184,85 @@ class KubernetesModelDeployer:
                     status_code=500, detail="Failed to delete PodMonitoring"
                 )
 
+    def create_hpa(
+        self,
+        model_name: str,
+        min_replicas: int = 1,
+        max_replicas: int = 5,
+        target_average_value: str = "5",
+    ):
+        custom_api = client.CustomObjectsApi()
+
+        hpa_body = {
+            "apiVersion": "autoscaling/v2",
+            "kind": "HorizontalPodAutoscaler",
+            "metadata": {"name": f"{model_name}-hpa", "namespace": self.namespace},
+            "spec": {
+                "scaleTargetRef": {
+                    "apiVersion": "apps/v1",
+                    "kind": "Deployment",
+                    "name": model_name,
+                },
+                "minReplicas": min_replicas,
+                "maxReplicas": max_replicas,
+                "metrics": [
+                    {
+                        "type": "Pods",
+                        "pods": {
+                            "metric": {
+                                "name": "prometheus.googleapis.com|modelserver_queue_size|gauge"
+                            },
+                            "target": {
+                                "type": "AverageValue",
+                                "averageValue": target_average_value,
+                            },
+                        },
+                    }
+                ],
+            },
+        }
+
+        try:
+            custom_api.create_namespaced_custom_object(
+                group="autoscaling",
+                version="v2",
+                namespace=self.namespace,
+                plural="horizontalpodautoscalers",
+                body=hpa_body,
+            )
+            logger.info(f"HorizontalPodAutoscaler '{model_name}-hpa' created.")
+        except ApiException as e:
+            if e.status == 409:
+                logger.info(
+                    f"HorizontalPodAutoscaler '{model_name}-hpa' already exists."
+                )
+            else:
+                logger.error(f"Exception when creating HorizontalPodAutoscaler: {e}\n")
+                raise HTTPException(
+                    status_code=500, detail="Failed to create HorizontalPodAutoscaler"
+                )
+
+    def delete_hpa(self, model_name: str):
+        custom_api = client.CustomObjectsApi()
+        try:
+            custom_api.delete_namespaced_custom_object(
+                group="autoscaling",
+                version="v2",
+                namespace=self.namespace,
+                plural="horizontalpodautoscalers",
+                name=f"{model_name}-hpa",
+                body=client.V1DeleteOptions(),
+            )
+            logger.info(f"HorizontalPodAutoscaler '{model_name}-hpa' deleted.")
+        except ApiException as e:
+            if e.status == 404:
+                logger.info(f"HorizontalPodAutoscaler '{model_name}-hpa' not found.")
+            else:
+                logger.error(f"Exception when deleting HorizontalPodAutoscaler: {e}\n")
+                raise HTTPException(
+                    status_code=500, detail="Failed to delete HorizontalPodAutoscaler"
+                )
+
     def create_pvc(self, storage_size="500Gi"):
         """
         Checks for an existing Persistent Volume Claim (PVC) with the given name. If it doesn't exist, creates a new PVC with the specified storage size.
