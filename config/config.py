@@ -11,6 +11,3 @@ DOCKER_IMAGE = os.getenv("DOCKER_IMAGE")
 NAMESPACE = os.getenv("NAMESPACE", "semoss")
 IMAGE_PULL_SECRET = os.getenv("IMAGE_PULL_SECRET")
 DEV = os.getenv("DEV", "false")
-
-
-logger.info(f"Running in {'development' if DEV == 'true' else 'production'} mode")

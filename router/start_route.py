@@ -1,28 +1,23 @@
 import logging
 from fastapi import APIRouter, HTTPException
 from pydantic_models.models import ModelRequest
-from deployer.kubernetes_deployer import KubernetesModelDeployer
-
+from deployer.model_deployer import KubernetesModelDeployer
 
 logger = logging.getLogger(__name__)
-
 start_router = APIRouter()
 
 
 @start_router.post("/start")
 def start_model(request: ModelRequest):
-    """
-    1. Create or find an existing persistent volume claim (PVC) for the model.
-    2. Creates a deployment and service using KubernetesModelDeployer.
-    3. Watches the deployment until it's ready.
-    4. Updates Zookeeper with the model's ClusterIP.
-    """
-
-    deployer = KubernetesModelDeployer()
+    deployer = KubernetesModelDeployer(
+        model_name=request.model_name,
+        model_id=request.model_id,
+        model_repo_name=request.model_repo_name,
+        operation="deploy",
+    )
 
     # Create or find an existing persistent volume claim (PVC) for the model
     try:
-        pvc_name = f"{request.model_name}-pvc"
         deployer.create_pvc()
     except Exception as e:
         logger.error(f"Error finding or creating PVC for {request.model_name}: {e}")
@@ -33,9 +28,7 @@ def start_model(request: ModelRequest):
 
     # Create a deployment for the model
     try:
-        deployer.create_deployment(
-            request.model_repo_name, request.model_id, request.model_name, pvc_name
-        )
+        deployer.create_deployment()
     except Exception as e:
         logger.error(f"Error creating deployment for {request.model_name}: {e}")
         raise HTTPException(
@@ -44,7 +37,7 @@ def start_model(request: ModelRequest):
 
     # Create a service for the model
     try:
-        deployer.create_service(request.model_id, request.model_name)
+        deployer.create_service()
     except Exception as e:
         logger.error(f"Error creating service for {request.model_name}: {e}")
         raise HTTPException(
@@ -53,7 +46,7 @@ def start_model(request: ModelRequest):
         )
 
     try:
-        deployer.create_podmonitoring(request.model_id, request.model_name)
+        deployer.create_podmonitoring()
     except Exception as e:
         logger.error(f"Error creating pod monitoring for {request.model_name}: {e}")
         raise HTTPException(
@@ -62,7 +55,7 @@ def start_model(request: ModelRequest):
         )
 
     try:
-        deployer.create_hpa(request.model_name)
+        deployer.create_hpa()
     except Exception as e:
         logger.error(f"Error creating HPA for {request.model_name}: {e}")
         raise HTTPException(
@@ -71,8 +64,8 @@ def start_model(request: ModelRequest):
         )
 
     # Update Zookeeper with the model's ClusterIP
-    if deployer.watch_deployment(request.model_name):
-        deployer.update_zookeeper(request.model_id, request.model_name)
+    if deployer.watch_deployment():
+        deployer.update_zookeeper()
     else:
         logger.error(
             f"The deployment and service for {request.model_name} were likely successful but failed to monitor deployment."
