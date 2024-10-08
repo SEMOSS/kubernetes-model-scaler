@@ -18,8 +18,10 @@ jobs:
           export DOCKER_TLS_CERTDIR=""
           ls -lah
           pwd
-          echo ${{ secrets.DOCKER_PASS}} | docker login ${{ vars.DOCKER_PRIVATE }} -u ${{ secrets.DOCKER_USER}} --password-stdin
-          echo ${{ secrets.SEMOSS_DOCKER_PASS}} | docker login ${{ vars.DOCKER_SEMOSS }} -u ${{ secrets.SEMOSS_DOCKER_USER}} --password-stdin
+          echo ${{ secrets.DOCKER_PASS}} | docker login ${{ vars.DOCKER_PRIVATE }} --username ${{ secrets.DOCKER_USER}} --password-stdin
+          echo "Docker login succeeded"
+          echo ${{ secrets.SEMOSS_DOCKER_PASS}} | docker login ${{ vars.DOCKER_SEMOSS }} --username ${{ secrets.SEMOSS_DOCKER_USER}} --password-stdin
+          echo "SEMOSS docker login succeeded"
           docker build . -t ${{ vars.DOCKER_PRIVATE }}/genai/kubernetes-model-scaler:$date
           docker tag ${{ vars.DOCKER_PRIVATE }}/genai/kubernetes-model-scaler:$date ${{ vars.DOCKER_SEMOSS }}/genai/kubernetes-model-scaler:$date
           docker push ${{ vars.DOCKER_SEMOSS }}/genai/kubernetes-model-scaler:$date
