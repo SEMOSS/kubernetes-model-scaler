@@ -15,7 +15,7 @@ class DeploymentMixin:
         volume = client.V1Volume(
             name="model-storage",
             persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
-                claim_name=f"{self.model_name}-pvc"
+                claim_name=f"filestore-cfg-pv-rwm"
             ),
         )
 
@@ -41,6 +41,8 @@ class DeploymentMixin:
                     "memory": "16Gi",
                 },
             ),
+            command=["/bin/bash", "-c"],
+            args=["-e", f"MODEL={self.model_name}"],
         )
 
         labels = {"model-id": self.model_id, "model-name": self.model_name}
