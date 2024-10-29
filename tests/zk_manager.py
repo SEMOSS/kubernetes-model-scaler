@@ -15,18 +15,36 @@ class ZKManager:
         self.zk = KazooClient(hosts=zk_hosts)
         self.zk.start()
 
-    def register_model(self, model_id, cluster_ip):
+    def register_warming_model(self, model_id, cluster_ip):
         try:
-            self.zk.create(f"/models/{model_id}", bytes(cluster_ip, "utf-8"))
+            self.zk.create(f"/models/warming/{model_id}", bytes(cluster_ip, "utf-8"))
+            logger.info(f"Registered model {model_id} with cluster IP {cluster_ip}")
+        except Exception as e:
+            logger.error(
+                f"Error registering model {model_id} with cluster IP {cluster_ip}: {e}"
+            )
+            raise
+
+    def unregister_warming_model(self, model_id):
+        try:
+            self.zk.delete(f"/models/warming/{model_id}")
+            logger.info(f"Unregistered model {model_id}")
+        except Exception as e:
+            logger.error(f"Error unregistering model {model_id}: {e}")
+            raise
+
+    def register_active_model(self, model_id, cluster_ip):
+        try:
+            self.zk.create(f"/models/active/{model_id}", bytes(cluster_ip, "utf-8"))
             logger.info(f"Registered model {model_id} with cluster IP {cluster_ip}")
         except Exception as e:
             logger.error(
                 f"Error registering model {model_id} with cluster IP {cluster_ip}: {e}"
             )
 
-    def unregister_model(self, model_id):
+    def unregister_active_model(self, model_id):
         try:
-            self.zk.delete(f"/models/{model_id}")
+            self.zk.delete(f"/models/active/{model_id}")
             logger.info(f"Unregistered model {model_id}")
         except Exception as e:
             logger.error(f"Error unregistering model {model_id}: {e}")

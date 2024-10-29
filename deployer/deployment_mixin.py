@@ -26,7 +26,10 @@ class DeploymentMixin:
         container = client.V1Container(
             name=self.model_name,
             image=self.docker_image,
-            env=[client.V1EnvVar(name="MODEL_REPO_NAME", value=self.model_repo_name)],
+            env=[
+                client.V1EnvVar(name="MODEL_REPO_NAME", value=self.model_repo_name),
+                client.V1EnvVar(name="MODEL", value=self.model_name),
+            ],
             ports=[client.V1ContainerPort(container_port=8888)],
             volume_mounts=[volume_mount],
             resources=client.V1ResourceRequirements(
@@ -41,8 +44,6 @@ class DeploymentMixin:
                     "memory": "16Gi",
                 },
             ),
-            command=["/bin/bash", "-c"],
-            args=["-e", f"MODEL={self.model_name}"],
         )
 
         labels = {"model-id": self.model_id, "model-name": self.model_name}

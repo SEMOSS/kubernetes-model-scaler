@@ -16,6 +16,26 @@ def start_model(request: ModelRequest):
         operation="deploy",
     )
 
+    # Create a service for the model... Need to create service before registering model..
+    try:
+        deployer.create_service()
+    except Exception as e:
+        logger.error(f"Error creating service for {request.model_name}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Model service creation failed for {request.model_name}",
+        )
+
+    # Register the model in Zookeeper in a warming state
+    try:
+        deployer.register_warming_model()
+    except Exception as e:
+        logger.error(f"Error registering warming model {request.model_name}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Model registration failed for warming model {request.model_name}",
+        )
+
     # Create or find an existing persistent volume claim (PVC) for the model
     try:
         deployer.create_pvc()
@@ -33,16 +53,6 @@ def start_model(request: ModelRequest):
         logger.error(f"Error creating deployment for {request.model_name}: {e}")
         raise HTTPException(
             status_code=500, detail=f"Model deployment failed for {request.model_name}"
-        )
-
-    # Create a service for the model
-    try:
-        deployer.create_service()
-    except Exception as e:
-        logger.error(f"Error creating service for {request.model_name}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Model service creation failed for {request.model_name}",
         )
 
     try:
@@ -65,7 +75,7 @@ def start_model(request: ModelRequest):
 
     # Update Zookeeper with the model's ClusterIP
     if deployer.watch_deployment():
-        deployer.update_zookeeper()
+        deployer.register_active_model()
     else:
         logger.error(
             f"The deployment and service for {request.model_name} were likely successful but failed to monitor deployment."

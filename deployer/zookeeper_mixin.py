@@ -4,23 +4,65 @@ logger = logging.getLogger(__name__)
 
 
 class ZookeeperMixin:
-    def update_zookeeper(self):
+    def register_warming_model(self):
         """
-        Updates Zookeeper with the mapping between model_id and the Service's ClusterIP, facilitating service discovery.
+        Registers the model in Zookeeper under the /models/warming path.
         """
         cluster_ip = self.get_service_cluster_ip()
         if cluster_ip:
-            path = f"/models/{self.model_id}"
-            # self.kazoo_client.ensure_path("/models")
+            path = f"/models/warming/{self.model_id}"
             self.kazoo_client.ensure_path(path)
             self.kazoo_client.set(path, cluster_ip.encode("utf-8"))
-            logger.info(f"Zookeeper updated at {path} with value {cluster_ip}")
+            logger.info(
+                f"Zookeeper is tracking warming model {self.model_id}  at {path}"
+            )
+        else:
+            logger.error(f"Could not find cluster IP for model {self.model_id}")
 
-    def remove_zookeeper(self):
+    def register_active_model(self):
         """
-        Removes the Zookeeper entry for the model, cleaning up after the model is stopped.
+        Unregister the model from the warming state and registers the model in Zookeeper under the /models/active path.
         """
-        path = f"/models/{self.model_id}"
+        # UNREGISTER MODEL AS WARMING
+        warming_model_path = f"/models/warming/{self.model_id}"
+        if self.kazoo_client.exists(warming_model_path):
+            self.kazoo_client.delete(warming_model_path)
+            logger.info(
+                f"Zookeeper entry {path} deleted for warming model {self.model_id}."
+            )
+        else:
+            logger.error(
+                f"Zookeeper entry {path} not found for warming model {self.model_id}."
+            )
+
+        # REGISTER MODEL AS ACTIVE
+        cluster_ip = self.get_service_cluster_ip()
+        if cluster_ip:
+            path = f"/models/active/{self.model_id}"
+            self.kazoo_client.ensure_path(path)
+            self.kazoo_client.set(path, cluster_ip.encode("utf-8"))
+            logger.info(f"Zookeeper is tracking active model {self.model_id} at {path}")
+        else:
+            logger.error(f"Could not find cluster IP for model {self.model_id}")
+
+    def unregister_warming_model(self):
+        """
+        Unregisters the model from Zookeeper under the /models/warming path.
+        """
+        path = f"/models/warming/{self.model_id}"
         if self.kazoo_client.exists(path):
             self.kazoo_client.delete(path)
             logger.info(f"Zookeeper entry {path} deleted.")
+        else:
+            logger.error(f"Zookeeper entry {path} not found.")
+
+    def unregister_active_model(self):
+        """
+        Unregisters the model from Zookeeper under the /models/active path.
+        """
+        path = f"/models/active/{self.model_id}"
+        if self.kazoo_client.exists(path):
+            self.kazoo_client.delete(path)
+            logger.info(f"Zookeeper entry {path} deleted.")
+        else:
+            logger.error(f"Zookeeper entry {path} not found.")
