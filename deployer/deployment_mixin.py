@@ -113,7 +113,8 @@ class DeploymentMixin:
 
     def watch_deployment(self):
         """
-        Monitors the Deployment until it reaches the desired state (all replicas are available and ready). Uses Kubernetes' watch API to stream events.
+        Monitors the Deployment until it reaches the desired state (all replicas are available and ready).
+        Uses Kubernetes' watch API to stream events.
         """
         api_instance = client.AppsV1Api()
         w = watch.Watch()
@@ -126,17 +127,79 @@ class DeploymentMixin:
                 deployment = event["object"]
                 if deployment.metadata.name == self.model_name:
                     status = deployment.status
+
                     logger.info(
-                        f"Deployment {self.model_name} status: Available Replicas: {status.available_replicas}, Ready Replicas: {status.ready_replicas}"
+                        f"Deployment {self.model_name} status: "
+                        f"Spec Replicas: {deployment.spec.replicas}, "
+                        f"Available: {status.available_replicas}, "
+                        f"Ready: {status.ready_replicas}, "
+                        f"Updated: {status.updated_replicas}"
                     )
+
+                    if status.conditions:
+                        for condition in status.conditions:
+                            if (
+                                condition.type == "Failed"
+                                and condition.status == "True"
+                            ):
+                                logger.error(f"Deployment failed: {condition.message}")
+                                w.stop()
+                                return False
+
                     if (
-                        status.available_replicas == status.replicas
-                        and status.ready_replicas == status.replicas
+                        status.available_replicas is not None
+                        and status.ready_replicas is not None
+                        and deployment.spec.replicas is not None
                     ):
-                        logger.info(f"Deployment {self.model_name} is healthy.")
+
+                        if (
+                            status.available_replicas == deployment.spec.replicas
+                            and status.ready_replicas == deployment.spec.replicas
+                        ):
+
+                            # Double check pod status
+                            core_v1 = client.CoreV1Api()
+                            pods = core_v1.list_namespaced_pod(
+                                namespace=self.namespace,
+                                label_selector=f"model-name={self.model_name}",
+                            )
+
+                            all_pods_ready = True
+                            for pod in pods.items:
+                                if pod.status.phase != "Running":
+                                    all_pods_ready = False
+                                    logger.info(
+                                        f"Pod {pod.metadata.name} is in {pod.status.phase} state"
+                                    )
+                                elif pod.status.container_statuses:
+                                    for container in pod.status.container_statuses:
+                                        if not container.ready:
+                                            all_pods_ready = False
+                                            if container.state.waiting:
+                                                logger.info(
+                                                    f"Container {container.name} is waiting: "
+                                                    f"{container.state.waiting.reason}"
+                                                )
+
+                            if all_pods_ready:
+                                logger.info(f"Deployment {self.model_name} is healthy.")
+                                w.stop()
+                                return True
+                            else:
+                                logger.info("Pods are not all ready yet")
+
+                    elif deployment.spec.replicas is None:
+                        logger.error("Deployment spec replicas is None!")
                         w.stop()
-                        return True
+                        return False
+
+            logger.error(
+                f"Watch timeout - deployment {self.model_name} did not become ready"
+            )
+            return False
+
         except ApiException as e:
             logger.error("Exception when watching deployment: %s\n" % e)
             raise HTTPException(status_code=500, detail="Failed to watch deployment")
-        return False
+        finally:
+            w.stop()
