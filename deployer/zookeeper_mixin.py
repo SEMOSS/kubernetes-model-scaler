@@ -28,11 +28,11 @@ class ZookeeperMixin:
         if self.kazoo_client.exists(warming_model_path):
             self.kazoo_client.delete(warming_model_path)
             logger.info(
-                f"Zookeeper entry {path} deleted for warming model {self.model_id}."
+                f"Zookeeper entry {warming_model_path} deleted for warming model {self.model_id}."
             )
         else:
             logger.error(
-                f"Zookeeper entry {path} not found for warming model {self.model_id}."
+                f"Zookeeper entry {warming_model_path} not found for warming model {self.model_id}."
             )
 
         # REGISTER MODEL AS ACTIVE

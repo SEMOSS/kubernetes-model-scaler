@@ -1,8 +1,14 @@
 import logging
 from kazoo.client import KazooClient
-from config.config import ZK_HOSTS
+import os
+import logging
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+
+load_dotenv()
+
+ZK_HOSTS = os.getenv("ZK_HOSTS")
 
 
 class ZKManager:
@@ -60,3 +66,11 @@ class ZKManager:
 
     def stop(self):
         self.zk.stop()
+
+
+if __name__ == "__main__":
+    host = os.getenv("ZK_HOSTS")
+    print(host)
+    zk = ZKManager()
+    models = zk.list_models()
+    print(models)
