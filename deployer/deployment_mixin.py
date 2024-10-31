@@ -122,7 +122,7 @@ class DeploymentMixin:
             for event in w.stream(
                 api_instance.list_namespaced_deployment,
                 namespace=self.namespace,
-                timeout_seconds=600,
+                timeout_seconds=6000,
             ):
                 deployment = event["object"]
                 if deployment.metadata.name == self.model_name:
