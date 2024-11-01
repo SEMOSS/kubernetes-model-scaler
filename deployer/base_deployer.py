@@ -12,9 +12,8 @@ class BaseDeployer:
     def __init__(
         self,
         operation,
-        model_name="",
+        model="",
         model_id="",
-        model_repo_name="",
         namespace=NAMESPACE,
         docker_image=DOCKER_IMAGE,
         zookeeper_hosts=ZK_HOSTS,
@@ -28,9 +27,8 @@ class BaseDeployer:
         self.image_pull_secret = image_pull_secret
         # Operation is determined by the endpoint that calls the deployer
         self.operation = operation
-        self.model_name = model_name
+        self.model_name = model
         self.model_id = model_id
-        self.model_repo_name = model_repo_name
         if dev == "true":
             logger.info("Using dev config")
             config.load_kube_config()
@@ -38,7 +36,7 @@ class BaseDeployer:
             logger.info("Using Incluster config")
             config.load_incluster_config()
 
-        # Verify that model_id, model_name, and model_repo_name are provided for deployment
+        # Verify that model_id and model_name are provided for deployment
         # Resolve model_id and model_name if only one is provided for deletion operations
         self.resolve_ids()
 
@@ -51,10 +49,10 @@ class BaseDeployer:
     def resolve_ids(self):
         logger.info("Resolving model ids")
         if self.operation == "deploy":
-            if not self.model_id or not self.model_name or not self.model_repo_name:
+            if not self.model_id or not self.model_name:
                 raise HTTPException(
                     status_code=400,
-                    detail="model_id, model_name, and model_repo_name are required for deployment",
+                    detail="model_id, model_name are required for deployment",
                 )
         elif self.operation == "delete":
             if not self.model_id and not self.model_name:

@@ -92,9 +92,8 @@ class ZookeeperDeploymentManager:
 @start_router.post("/start")
 def start_model(request: ModelRequest):
     deployer = KubernetesModelDeployer(
-        model_name=request.model_name,
+        model=request.model,
         model_id=request.model_id,
-        model_repo_name=request.model_repo_name,
         operation="deploy",
     )
 

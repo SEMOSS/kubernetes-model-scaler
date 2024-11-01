@@ -27,7 +27,6 @@ class DeploymentMixin:
             name=self.model_name,
             image=self.docker_image,
             env=[
-                client.V1EnvVar(name="MODEL_REPO_NAME", value=self.model_repo_name),
                 client.V1EnvVar(name="MODEL", value=self.model_name),
             ],
             ports=[client.V1ContainerPort(container_port=8888)],
