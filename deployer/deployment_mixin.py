@@ -15,7 +15,7 @@ class DeploymentMixin:
         volume = client.V1Volume(
             name="model-storage",
             persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
-                claim_name=f"filestore-cfg-pv-rwm"
+                claim_name=f"filestore-cfg-pvc-rwm"
             ),
         )
 
