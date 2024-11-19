@@ -47,6 +47,11 @@ class DeploymentMixin:
 
         labels = {"model-id": self.model_id, "model-name": self.model_name}
 
+        node_selector = {
+            "cloud.google.com/gke-accelerator": "nvidia-tesla-t4",
+            "cloud.google.com/gke-nodepool": "gpu-node-pool-c",
+        }
+
         template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(labels=labels),
             spec=client.V1PodSpec(
@@ -57,7 +62,7 @@ class DeploymentMixin:
                     if self.image_pull_secret
                     else None
                 ),
-                node_selector={"cloud.google.com/gke-accelerator": "nvidia-tesla-t4"},
+                node_selector=node_selector,
                 tolerations=[
                     client.V1Toleration(
                         key="nvidia.com/gpu", operator="Exists", effect="NoSchedule"
