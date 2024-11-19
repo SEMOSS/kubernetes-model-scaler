@@ -49,7 +49,7 @@ class DeploymentMixin:
 
         node_selector = {
             "cloud.google.com/gke-accelerator": "nvidia-tesla-t4",
-            "cloud.google.com/gke-nodepool": "gpu-node-pool-c",
+            "cloud.google.com/gke-nodepool": "gpu-node-pool-a",
         }
 
         template = client.V1PodTemplateSpec(
