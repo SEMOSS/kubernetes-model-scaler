@@ -13,7 +13,8 @@ class PVCMixin:
         api_instance = client.CoreV1Api()
 
         # check if the PVC already exists
-        pvc_name = "filestore-cfg-pv-rwm"
+        # pvc_name = "filestore-cfg-pv-rwm"
+        pvc_name = "filestore-cfg-pvc-rwm"
         try:
             existing_pvc = api_instance.read_namespaced_persistent_volume_claim(
                 name=pvc_name, namespace=self.namespace
