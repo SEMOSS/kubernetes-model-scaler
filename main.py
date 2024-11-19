@@ -11,8 +11,6 @@ from router.stop_route import stop_router
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,6 +21,8 @@ async def lifespan(app: FastAPI):
     yield
     clean_up_zk()
 
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(health_check_router, prefix="/api")
 app.include_router(version_router, prefix="/api")
