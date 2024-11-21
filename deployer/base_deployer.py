@@ -55,15 +55,15 @@ class BaseDeployer:
                     detail="model_id, model_name are required for deployment",
                 )
         elif self.operation == "delete":
+            # For deletion, we only need model_id
             if not self.model_id and not self.model_name:
                 raise HTTPException(
                     status_code=400,
                     detail="Either model_id or model_name must be provided",
                 )
-            if not self.model_id:
+            # If we don't have model_id but have name, get the id
+            if not self.model_id and self.model_name:
                 self.model_id = self.get_model_id_from_name(self.model_name)
-            if not self.model_name:
-                self.model_name = self.get_model_name_from_id(self.model_id)
 
     def get_model_name_from_id(self, model_id: str) -> str:
         """
