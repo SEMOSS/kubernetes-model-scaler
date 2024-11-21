@@ -20,23 +20,29 @@ class ZookeeperMixin:
 
     def _get_zk_data(self, path: str) -> dict:
         """
-        Retrieves and parses the JSON data stored in Zookeeper.
+        Retrieves and parses the data stored in Zookeeper. Handles both JSON and legacy formats.
 
         Args:
             path (str): The Zookeeper path to read from
 
         Returns:
-            dict: The parsed JSON data containing IP and model name
+            dict: The parsed data containing IP and model name
         """
         if self.kazoo_client.exists(path):
             data = self.kazoo_client.get(path)[0]
-            return json.loads(data.decode("utf-8"))
+            try:
+                return json.loads(data.decode("utf-8"))
+            except json.JSONDecodeError:
+                # Legacy format - just IP address
+                return {
+                    "ip": data.decode("utf-8"),
+                    "model_name": self.model_name,  # Use model name from k8s labels
+                }
         return None
 
     def register_warming_model(self):
         """
         Registers the model in Zookeeper under the /models/warming path.
-        Stores both the cluster IP and model name.
         """
         cluster_ip = self.get_service_cluster_ip()
         if cluster_ip:
@@ -55,18 +61,17 @@ class ZookeeperMixin:
     def register_active_model(self):
         """
         Unregister the model from the warming state and registers the model in Zookeeper under the /models/active path.
-        Stores both the cluster IP and model name.
         """
         # UNREGISTER MODEL AS WARMING
         warming_model_path = f"/models/warming/{self.model_id}"
         if self.kazoo_client.exists(warming_model_path):
             self.kazoo_client.delete(warming_model_path)
             logger.info(
-                f"Zookeeper entry {warming_model_path} deleted for warming model {self.model_id} ({self.model_name})."
+                f"Zookeeper entry {warming_model_path} deleted for warming model {self.model_id} ({self.model_name})"
             )
         else:
             logger.error(
-                f"Zookeeper entry {warming_model_path} not found for warming model {self.model_id} ({self.model_name})."
+                f"Zookeeper entry {warming_model_path} not found for warming model {self.model_id} ({self.model_name})"
             )
 
         # REGISTER MODEL AS ACTIVE
@@ -90,13 +95,13 @@ class ZookeeperMixin:
         """
         path = f"/models/warming/{self.model_id}"
         if self.kazoo_client.exists(path):
-            data = self._get_zk_data(path)
+            model_data = self._get_zk_data(path)
             self.kazoo_client.delete(path)
             logger.info(
-                f"Zookeeper entry {path} deleted for model {self.model_id} ({data.get('model_name') if data else 'unknown'})"
+                f"Zookeeper entry {path} deleted for warming model {self.model_id} ({model_data.get('model_name', self.model_name)})"
             )
         else:
-            logger.error(f"Zookeeper entry {path} not found.")
+            logger.error(f"Zookeeper entry {path} not found")
 
     def unregister_active_model(self):
         """
@@ -104,10 +109,10 @@ class ZookeeperMixin:
         """
         path = f"/models/active/{self.model_id}"
         if self.kazoo_client.exists(path):
-            data = self._get_zk_data(path)
+            model_data = self._get_zk_data(path)
             self.kazoo_client.delete(path)
             logger.info(
-                f"Zookeeper entry {path} deleted for model {self.model_id} ({data.get('model_name') if data else 'unknown'})"
+                f"Zookeeper entry {path} deleted for active model {self.model_id} ({model_data.get('model_name', self.model_name)})"
             )
         else:
-            logger.error(f"Zookeeper entry {path} not found.")
+            logger.error(f"Zookeeper entry {path} not found")
