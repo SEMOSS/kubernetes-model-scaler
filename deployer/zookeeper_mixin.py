@@ -28,17 +28,24 @@ class ZookeeperMixin:
         Returns:
             dict: The parsed data containing IP and model name
         """
-        if self.kazoo_client.exists(path):
-            data = self.kazoo_client.get(path)[0]
-            try:
-                return json.loads(data.decode("utf-8"))
-            except json.JSONDecodeError:
-                # Legacy format - just IP address
-                return {
-                    "ip": data.decode("utf-8"),
-                    "model_name": self.model_name,  # Use model name from k8s labels
-                }
-        return None
+        try:
+            if self.kazoo_client.exists(path):
+                data = self.kazoo_client.get(path)[0]
+                try:
+                    # Try to parse as JSON first
+                    return json.loads(data.decode("utf-8"))
+                except json.JSONDecodeError:
+                    # Legacy format - just IP address
+                    ip = data.decode("utf-8").strip()
+                    logger.info(f"Found legacy format data for {path}: {ip}")
+                    return {
+                        "ip": ip,
+                        "model_name": self.model_name if self.model_name else "unknown",
+                    }
+            return None
+        except Exception as e:
+            logger.error(f"Error getting data from {path}: {str(e)}")
+            return None
 
     def register_warming_model(self):
         """
@@ -109,10 +116,22 @@ class ZookeeperMixin:
         """
         path = f"/models/active/{self.model_id}"
         if self.kazoo_client.exists(path):
-            model_data = self._get_zk_data(path)
-            self.kazoo_client.delete(path)
-            logger.info(
-                f"Zookeeper entry {path} deleted for active model {self.model_id} ({model_data.get('model_name', self.model_name)})"
-            )
+            try:
+                model_data = self._get_zk_data(path)
+                # Even if we can't get the data, we still want to delete the node
+                self.kazoo_client.delete(path)
+
+                if model_data:
+                    logger.info(
+                        f"Zookeeper entry {path} deleted for active model {self.model_id} ({model_data.get('model_name', self.model_name)})"
+                    )
+                else:
+                    logger.info(
+                        f"Zookeeper entry {path} deleted for active model {self.model_id}"
+                    )
+
+            except Exception as e:
+                logger.error(f"Error while deleting Zookeeper entry {path}: {str(e)}")
+                raise
         else:
             logger.error(f"Zookeeper entry {path} not found")
