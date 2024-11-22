@@ -3,7 +3,7 @@ from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from fastapi import HTTPException
 from kazoo.client import KazooClient
-from config.config import ZK_HOSTS, NAMESPACE, IMAGE_PULL_SECRET, DOCKER_IMAGE, DEV
+from config.config import ZK_HOSTS, NAMESPACE, IMAGE_PULL_SECRET, DOCKER_IMAGE, IS_DEV
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class BaseDeployer:
         docker_image=DOCKER_IMAGE,
         zookeeper_hosts=ZK_HOSTS,
         image_pull_secret=IMAGE_PULL_SECRET,
-        dev=DEV,
+        dev=IS_DEV,
     ):
         # These are all environment variables
         self.namespace = namespace
