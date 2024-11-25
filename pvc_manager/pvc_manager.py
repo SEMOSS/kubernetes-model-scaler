@@ -81,6 +81,30 @@ class PVCManager:
             print(f"Error accessing directory {pvc_path}: {e}")
             return []
 
+    def log_directory_tree(self, path: str, level: int = 0) -> None:
+        """
+        Print the entire directory tree starting from the given path
+        """
+        try:
+            prefix = "  " * level + ("└── " if level > 0 else "")
+            path_obj = Path(path)
+            logger.info(f"{prefix}{path_obj.name}/")
+
+            try:
+                for item in path_obj.iterdir():
+                    if item.is_dir():
+                        self.log_directory_tree(str(item), level + 1)
+                    else:
+                        child_prefix = "  " * (level + 1) + "└── "
+                        logger.info(f"{child_prefix}{item.name}")
+            except PermissionError as e:
+                logger.error(f"Permission denied accessing {path}: {e}")
+            except Exception as e:
+                logger.error(f"Error accessing {path}: {e}")
+
+        except Exception as e:
+            logger.error(f"Error processing {path}: {e}")
+
     def get_model_dir_size(self, model_dir: str) -> str:
         """
         Get the size of a model directory with appropriate units

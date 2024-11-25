@@ -12,6 +12,7 @@ from router.stop_route import stop_router
 from router.pvc_manager.get_pvcs_route import get_pvc_router
 from router.pvc_manager.remove_model_route import remove_model_router
 from router.pvc_manager.download_model_route import download_model_router
+from router.pvc_manager.log_pvc_contents_route import pvc_contents_router
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ app.include_router(stop_router, prefix="/api")
 app.include_router(get_pvc_router, prefix="/api/pvc")
 app.include_router(remove_model_router, prefix="/api/pvc")
 app.include_router(download_model_router, prefix="/api/pvc")
+app.include_router(pvc_contents_router, prefix="/api/pvc")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
