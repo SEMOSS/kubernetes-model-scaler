@@ -25,16 +25,13 @@ class PVCManager:
 
     def get_pvcs(self) -> List[str]:
         """
-        Identify the mounted PVCs off the base path, including snapshot subdirectories
+        Identify the mounted PVCs off the base path
         """
         mounted_pvs = []
         for root, dirs, files in os.walk(self.base_path):
             for dir in dirs:
-                full_path = os.path.join(root, dir)
-                if os.path.ismount(full_path):
-                    mounted_pvs.append(full_path)
-                elif "SNAPSHOT" in dir and os.path.exists(full_path):
-                    mounted_pvs.append(full_path)
+                if os.path.ismount(os.path.join(root, dir)):
+                    mounted_pvs.append(os.path.join(root, dir))
         return mounted_pvs
 
     def get_pvc_usage(self, pvc: str) -> dict:
@@ -51,20 +48,37 @@ class PVCManager:
 
     def get_pvc_models(self, pvc: str) -> List[Dict]:
         """
-        Get the models stored in each PVC
+        Get the models stored in each PVC, handling snapshot subdirectories
         """
         try:
-            pvcs = os.listdir(pvc)
+            # check if there's a snapshot directory
+            pvc_contents = os.listdir(pvc)
+            base_path = pvc
+
+            # If SNAPSHOT directory exist update the base path to include it
+            snapshot_dirs = [
+                d
+                for d in pvc_contents
+                if "SNAPSHOT" in d and os.path.isdir(os.path.join(pvc, d))
+            ]
+            if snapshot_dirs:
+                base_path = os.path.join(pvc, snapshot_dirs[0])
+                # Get the contents of the snapshot directory instead
+                pvc_contents = os.listdir(base_path)
+
             models = []
-            for model_dir in pvcs:
-                full_path = os.path.join(pvc, model_dir)
+            for model_dir in pvc_contents:
+                full_path = os.path.join(base_path, model_dir)
                 if os.path.isdir(full_path):
+                    # Skip if this is a SNAPSHOT directory
+                    if "SNAPSHOT" in model_dir:
+                        continue
+
                     size = self.get_model_dir_size(full_path)
-                    path = os.path.join(pvc, model_dir)
                     model = {
                         "name": model_dir,
                         "size": size,
-                        "path": path,
+                        "path": full_path,
                     }
                     models.append(model)
             return models
