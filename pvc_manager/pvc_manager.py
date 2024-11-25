@@ -25,13 +25,16 @@ class PVCManager:
 
     def get_pvcs(self) -> List[str]:
         """
-        Identify the mounted PVCs off the base path
+        Identify the mounted PVCs off the base path, including snapshot subdirectories
         """
         mounted_pvs = []
         for root, dirs, files in os.walk(self.base_path):
             for dir in dirs:
-                if os.path.ismount(os.path.join(root, dir)):
-                    mounted_pvs.append(os.path.join(root, dir))
+                full_path = os.path.join(root, dir)
+                if os.path.ismount(full_path):
+                    mounted_pvs.append(full_path)
+                elif "SNAPSHOT" in dir and os.path.exists(full_path):
+                    mounted_pvs.append(full_path)
         return mounted_pvs
 
     def get_pvc_usage(self, pvc: str) -> dict:
