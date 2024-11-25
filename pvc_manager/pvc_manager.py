@@ -1,7 +1,11 @@
 import os
 import shutil
 from typing import Dict, List, Tuple
+from pathlib import Path
 from pvc_manager.download_manager import DownloadManager
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class PVCManager:
@@ -46,44 +50,35 @@ class PVCManager:
             "free": self.format_size(free),
         }
 
-    def get_pvc_models(self, pvc: str) -> List[Dict]:
+    def get_pvc_models(self, pvc_path: str) -> List[Dict]:
         """
         Get the models stored in each PVC, handling snapshot subdirectories
         """
         try:
             # check if there's a snapshot directory
-            pvc_contents = os.listdir(pvc)
-            base_path = pvc
+            base_path = pvc_path
+            logger.info(f"Checking for snapshot directory in {base_path}")
 
-            # If SNAPSHOT directory exist update the base path to include it
-            snapshot_dirs = [
-                d
-                for d in pvc_contents
-                if "SNAPSHOT" in d and os.path.isdir(os.path.join(pvc, d))
-            ]
-            if snapshot_dirs:
-                base_path = os.path.join(pvc, snapshot_dirs[0])
-                # Get the contents of the snapshot directory instead
-                pvc_contents = os.listdir(base_path)
+            for item in Path(base_path).iterdir():
+                logger.info(f"Checking {item}")
+                if "snapshot" in item.name.lower() and item.is_dir():
+                    base_path = item
+                    break
+
+            pvc_contents = [d for d in Path(base_path).iterdir() if d.is_dir()]
 
             models = []
             for model_dir in pvc_contents:
-                full_path = os.path.join(base_path, model_dir)
-                if os.path.isdir(full_path):
-                    # Skip if this is a SNAPSHOT directory
-                    if "SNAPSHOT" in model_dir:
-                        continue
-
-                    size = self.get_model_dir_size(full_path)
-                    model = {
-                        "name": model_dir,
-                        "size": size,
-                        "path": full_path,
-                    }
-                    models.append(model)
+                size = self.get_model_dir_size(model_dir)
+                model = {
+                    "name": model_dir.name,
+                    "size": size,
+                    "path": model_dir,
+                }
+                models.append(model)
             return models
         except OSError as e:
-            print(f"Error accessing directory {pvc}: {e}")
+            print(f"Error accessing directory {pvc_path}: {e}")
             return []
 
     def get_model_dir_size(self, model_dir: str) -> str:
