@@ -7,30 +7,22 @@ logger = logging.getLogger(__name__)
 
 
 class DeploymentMixin:
+
     def create_deployment(self):
-        """
-        Creates a Kubernetes Deployment for the given model, setting up the necessary container specifications and environment variables.
-        """
-
-        volume = client.V1Volume(
-            name="model-storage",
-            persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
-                claim_name=f"filestore-cfg-pvc-rwm"
-            ),
-        )
-
-        volume_mount = client.V1VolumeMount(
-            name="model-storage", mount_path="/app/model_files"
-        )
-
-        container = client.V1Container(
+        app_container = client.V1Container(
             name=self.model_name,
             image=self.docker_image,
             env=[
                 client.V1EnvVar(name="MODEL", value=self.model_name),
             ],
             ports=[client.V1ContainerPort(container_port=8888)],
-            volume_mounts=[volume_mount],
+            volume_mounts=[
+                client.V1VolumeMount(
+                    name="gcs-fuse-csi-ephemeral",
+                    mount_path="/app/model_files",
+                    mount_propagation="HostToContainer",
+                )
+            ],
             resources=client.V1ResourceRequirements(
                 limits={
                     "nvidia.com/gpu": "1",
@@ -43,6 +35,22 @@ class DeploymentMixin:
                     "memory": "16Gi",
                 },
             ),
+            security_context=client.V1SecurityContext(
+                privileged=True, capabilities=client.V1Capabilities(add=["SYS_ADMIN"])
+            ),
+        )
+
+        # Configuring the CSI volume
+        volume = client.V1Volume(
+            name="gcs-fuse-csi-ephemeral",
+            csi=client.V1CSIVolumeSource(
+                driver="gcsfuse.csi.storage.gke.io",
+                volume_attributes={
+                    "bucketName": "semoss-model-files",
+                    "gcsfuseLoggingSeverity": "warning",
+                    "mountOptions": "implicit-dirs",
+                },
+            ),
         )
 
         labels = {"model-id": self.model_id, "model-name": self.model_name}
@@ -53,9 +61,11 @@ class DeploymentMixin:
         }
 
         template = client.V1PodTemplateSpec(
-            metadata=client.V1ObjectMeta(labels=labels),
+            metadata=client.V1ObjectMeta(
+                labels=labels, annotations={"gke-gcsfuse/volumes": "true"}
+            ),
             spec=client.V1PodSpec(
-                containers=[container],
+                containers=[app_container],
                 volumes=[volume],
                 image_pull_secrets=(
                     [client.V1LocalObjectReference(name=self.image_pull_secret)]
@@ -68,18 +78,14 @@ class DeploymentMixin:
                         key="nvidia.com/gpu", operator="Exists", effect="NoSchedule"
                     )
                 ],
+                service_account_name="fuse-ksa",
             ),
         )
 
         spec = client.V1DeploymentSpec(
             replicas=1,
             template=template,
-            selector={
-                "matchLabels": {
-                    "model-id": self.model_id,
-                    "model-name": self.model_name,
-                }
-            },
+            selector={"matchLabels": labels},
         )
 
         deployment = client.V1Deployment(
@@ -161,7 +167,6 @@ class DeploymentMixin:
                             and status.ready_replicas == deployment.spec.replicas
                         ):
 
-                            # Double check pod status
                             core_v1 = client.CoreV1Api()
                             pods = core_v1.list_namespaced_pod(
                                 namespace=self.namespace,

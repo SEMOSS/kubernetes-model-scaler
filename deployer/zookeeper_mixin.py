@@ -5,34 +5,22 @@ logger = logging.getLogger(__name__)
 
 
 class ZookeeperMixin:
-    def _create_zk_data(self, cluster_ip: str) -> bytes:
+    def _create_zk_data(self) -> bytes:
         """
-        Creates a JSON object containing both the cluster IP and model name.
-
-        Args:
-            cluster_ip (str): The cluster IP address of the service
-
-        Returns:
-            bytes: JSON encoded data for Zookeeper storage
+        Creates a JSON object containing the endpoint address and model name.
+        The endpoint combines node IP and port into a single address string.
         """
-        data = {"ip": cluster_ip, "model_name": self.model_name}
+        node_ip, node_port = self.get_service_endpoint()
+        endpoint = f"{node_ip}:{node_port}"
+        data = {"ip": endpoint, "model_name": self.model_name}
         return json.dumps(data).encode("utf-8")
 
     def _get_zk_data(self, path: str) -> dict:
-        """
-        Retrieves and parses the data stored in Zookeeper. Handles both JSON and legacy formats.
-
-        Args:
-            path (str): The Zookeeper path to read from
-
-        Returns:
-            dict: The parsed data containing IP and model name
-        """
+        """Retrieves and parses the data stored in Zookeeper. Handles both JSON and legacy formats."""
         try:
             if self.kazoo_client.exists(path):
                 data = self.kazoo_client.get(path)[0]
                 try:
-                    # Try to parse as JSON first
                     return json.loads(data.decode("utf-8"))
                 except json.JSONDecodeError:
                     # Legacy format - just IP address
@@ -51,19 +39,19 @@ class ZookeeperMixin:
         """
         Registers the model in Zookeeper under the /models/warming path.
         """
-        cluster_ip = self.get_service_cluster_ip()
-        if cluster_ip:
+        try:
             path = f"/models/warming/{self.model_id}"
             self.kazoo_client.ensure_path(path)
-            zk_data = self._create_zk_data(cluster_ip)
+            zk_data = self._create_zk_data()
             self.kazoo_client.set(path, zk_data)
             logger.info(
                 f"Zookeeper is tracking warming model {self.model_id} ({self.model_name}) at {path}"
             )
-        else:
+        except Exception as e:
             logger.error(
-                f"Could not find cluster IP for model {self.model_id} ({self.model_name})"
+                f"Failed to register warming model {self.model_id} ({self.model_name}): {str(e)}"
             )
+            raise
 
     def register_active_model(self):
         """
@@ -82,19 +70,19 @@ class ZookeeperMixin:
             )
 
         # REGISTER MODEL AS ACTIVE
-        cluster_ip = self.get_service_cluster_ip()
-        if cluster_ip:
+        try:
             path = f"/models/active/{self.model_id}"
             self.kazoo_client.ensure_path(path)
-            zk_data = self._create_zk_data(cluster_ip)
+            zk_data = self._create_zk_data()
             self.kazoo_client.set(path, zk_data)
             logger.info(
                 f"Zookeeper is tracking active model {self.model_id} ({self.model_name}) at {path}"
             )
-        else:
+        except Exception as e:
             logger.error(
-                f"Could not find cluster IP for model {self.model_id} ({self.model_name})"
+                f"Failed to register active model {self.model_id} ({self.model_name}): {str(e)}"
             )
+            raise
 
     def unregister_warming_model(self):
         """
