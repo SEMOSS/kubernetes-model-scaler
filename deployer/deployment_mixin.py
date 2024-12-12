@@ -14,6 +14,8 @@ class DeploymentMixin:
             image=self.docker_image,
             env=[
                 client.V1EnvVar(name="MODEL", value=self.model_name),
+                client.V1EnvVar(name="MODEL_REPO_ID", value=self.model_repo_id),
+                client.V1EnvVar(name="TYPE", value=self.model_type),
             ],
             ports=[client.V1ContainerPort(container_port=8888)],
             volume_mounts=[
@@ -111,6 +113,19 @@ class DeploymentMixin:
         """
         api_instance = client.AppsV1Api()
         try:
+            # Add debug logging
+            logger.info(
+                f"Attempting to delete deployment {self.model_name} in namespace {self.namespace}"
+            )
+
+            # List deployments in namespace first
+            deployments = api_instance.list_namespaced_deployment(
+                namespace=self.namespace
+            )
+            logger.info(
+                f"Current deployments in namespace {self.namespace}: {[dep.metadata.name for dep in deployments.items]}"
+            )
+
             api_instance.delete_namespaced_deployment(
                 name=self.model_name,
                 namespace=self.namespace,
@@ -118,7 +133,10 @@ class DeploymentMixin:
             )
             logger.info(f"Deployment {self.model_name} deleted.")
         except ApiException as e:
-            logger.error("Exception when deleting deployment: %s\n" % e)
+            logger.error(
+                f"Exception when deleting deployment: %s\nNamespace: {self.namespace}\nName: {self.model_name}"
+                % e
+            )
             raise HTTPException(status_code=500, detail="Failed to delete deployment")
 
     def watch_deployment(self):

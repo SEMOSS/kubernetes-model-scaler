@@ -19,7 +19,11 @@ def stop_model(model_id: str = None, model: str = None):
         )
 
     deployer = KubernetesModelDeployer(
-        operation="delete", model_id=model_id, model=model
+        operation="delete",
+        model_id=model_id,
+        model=model,
+        model_repo_id="",
+        model_type="",
     )
 
     try:

@@ -12,58 +12,60 @@ class BaseDeployer:
     def __init__(
         self,
         operation,
-        model="",
-        model_id="",
-        namespace=NAMESPACE,
-        docker_image=DOCKER_IMAGE,
-        zookeeper_hosts=ZK_HOSTS,
-        image_pull_secret=IMAGE_PULL_SECRET,
-        dev=IS_DEV,
+        model,
+        model_id,
+        model_repo_id,
+        model_type,
     ):
+        """All of these variables are available to each of the mixins"""
         # These are all environment variables
-        self.namespace = namespace
-        self.docker_image = docker_image
-        self.zookeeper_hosts = zookeeper_hosts
-        self.image_pull_secret = image_pull_secret
-        # Operation is determined by the endpoint that calls the deployer
-        self.operation = operation
-        self.model_name = model
-        self.model_id = model_id
-        if dev == "true":
+        self.namespace = NAMESPACE
+        self.docker_image = DOCKER_IMAGE
+        self.zookeeper_hosts = ZK_HOSTS
+        self.image_pull_secret = IMAGE_PULL_SECRET
+
+        self.operation = operation  # Start or stop determined by endpoint
+
+        self.model_name = model  # The SEMOSS short name for the model
+        self.model_id = model_id  # The SEMOSS UUID for the model
+        self.model_repo_id = model_repo_id  # The HuggingFace model repo ID
+        self.model_type = model_type  # The model type
+        if IS_DEV == "true":
             logger.info("Using dev config")
-            config.load_kube_config()
+            # If you are using this locally you will need to change this to match your kubeconfig
+            config.load_kube_config(context="standard")
         else:
             logger.info("Using Incluster config")
             config.load_incluster_config()
 
         # Verify that model_id and model_name are provided for deployment
         # Resolve model_id and model_name if only one is provided for deletion operations
-        self.resolve_ids()
+        # self.resolve_ids()
 
         logger.info(
-            f"Initializing BaseDeployer with namespace={namespace}, zookeeper_hosts={zookeeper_hosts}, image_pull_secret={image_pull_secret}"
+            f"Initializing BaseDeployer with namespace={self.namespace}, zookeeper_hosts={self.zookeeper_hosts}, image_pull_secret={self.image_pull_secret}"
         )
         self.kazoo_client = KazooClient(hosts=self.zookeeper_hosts)
         self.kazoo_client.start()
 
-    def resolve_ids(self):
-        logger.info("Resolving model ids")
-        if self.operation == "deploy":
-            if not self.model_id or not self.model_name:
-                raise HTTPException(
-                    status_code=400,
-                    detail="model_id, model_name are required for deployment",
-                )
-        elif self.operation == "delete":
-            if not self.model_id and not self.model_name:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Either model_id or model_name must be provided",
-                )
-            if not self.model_id:
-                self.model_id = self.get_model_id_from_name(self.model_name)
-            if not self.model_name:
-                self.model_name = self.get_model_name_from_id(self.model_id)
+    # def resolve_ids(self):
+    #     logger.info("Resolving model ids")
+    #     if self.operation == "deploy":
+    #         if not self.model_id or not self.model_name:
+    #             raise HTTPException(
+    #                 status_code=400,
+    #                 detail="model_id, model_name are required for deployment",
+    #             )
+    #     elif self.operation == "delete":
+    #         if not self.model_id and not self.model_name:
+    #             raise HTTPException(
+    #                 status_code=400,
+    #                 detail="Either model_id or model_name must be provided",
+    #             )
+    #         if not self.model_id:
+    #             self.model_id = self.get_model_id_from_name(self.model_name)
+    #         if not self.model_name:
+    #             self.model_name = self.get_model_name_from_id(self.model_id)
 
     def get_model_name_from_id(self, model_id: str) -> str:
         """
