@@ -50,11 +50,7 @@ class DeploymentMixin:
                 volume_attributes={
                     "bucketName": "semoss-model-files",
                     "gcsfuseLoggingSeverity": "warning",
-                    "mountOptions": (
-                        "implicit-dirs,"
-                        # I'm mounting only the model directory, cache and tmp directories
-                        f"only-dir={self.model_name}:.cache:.gcsfuse_tmp,"
-                    ),
+                    "mountOptions": f"implicit-dirs,only-dir={self.model_name}:.cache:.gcsfuse_tmp",
                 },
             ),
         )
