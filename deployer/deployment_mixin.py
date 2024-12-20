@@ -54,7 +54,6 @@ class DeploymentMixin:
                         "implicit-dirs,"
                         # I'm mounting only the model directory, cache and tmp directories
                         f"only-dir={self.model_name}:.cache:.gcsfuse_tmp,"
-                        "type-cache-ttl=3600"
                     ),
                 },
             ),
