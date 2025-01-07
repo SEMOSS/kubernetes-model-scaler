@@ -23,13 +23,13 @@ class MonitoringMixin:
                 "selector": {
                     "matchLabels": {
                         "model-name": self.model_name,
-                        # "model-id": model_id,
                     }
                 },
                 "endpoints": [
                     {
                         "port": 8888,
                         "interval": "15s",
+                        "path": "/metrics",
                     }
                 ],
                 "targetLabels": {"metadata": ["pod", "container"]},

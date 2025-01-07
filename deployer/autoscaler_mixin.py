@@ -13,6 +13,9 @@ class AutoscalerMixin:
         max_replicas: int = 5,
         target_average_value: str = "5",
     ):
+        """
+        Creates a HorizontalPodAutoscaler resource for the deployed model using External metrics from GMP.
+        """
         custom_api = client.CustomObjectsApi()
 
         hpa_body = {
@@ -29,10 +32,22 @@ class AutoscalerMixin:
                 "maxReplicas": max_replicas,
                 "metrics": [
                     {
-                        "type": "Pods",
-                        "pods": {
+                        "type": "External",
+                        "external": {
+                            # "metric": {
+                            #     "name": "prometheus.googleapis.com|modelserver_queue_size|gauge",
+                            #     "selector": {
+                            #         "matchLabels": {"model-name": self.model_name}
+                            #     },
+                            # },
                             "metric": {
-                                "name": "prometheus.googleapis.com|modelserver_queue_size|gauge"
+                                "name": "custom.googleapis.com|prometheus|modelserver_queue_size",
+                                "selector": {
+                                    "matchLabels": {
+                                        "model-name": self.model_name,
+                                        "namespace": self.namespace,
+                                    }
+                                },
                             },
                             "target": {
                                 "type": "AverageValue",
@@ -65,6 +80,9 @@ class AutoscalerMixin:
                 )
 
     def delete_hpa(self):
+        """
+        Deletes the HorizontalPodAutoscaler resource associated with the model.
+        """
         custom_api = client.CustomObjectsApi()
         try:
             custom_api.delete_namespaced_custom_object(
