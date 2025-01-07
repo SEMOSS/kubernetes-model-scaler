@@ -51,10 +51,19 @@ class DeploymentMixin:
                     "bucketName": "semoss-model-files",
                     "gcsfuseLoggingSeverity": "warning",
                     "mountOptions": "implicit-dirs",
-                    "only-dir": f"{self.model_name}:.cache:.gcsfuse_tmp",
+                    "only-dir": f"{self.model_name}",
                 },
             ),
         )
+
+        additional_env = [
+            client.V1EnvVar(name="GCSFUSE_DEBUG", value="true"),
+            client.V1EnvVar(name="GCSFUSE_DEBUG_GCS", value="true"),
+            client.V1EnvVar(name="GCSFUSE_DEBUG_FUSE", value="true"),
+            client.V1EnvVar(name="GCSFUSE_DEBUG_HTTP", value="true"),
+        ]
+
+        app_container.env.extend(additional_env)
 
         labels = {"model-id": self.model_id, "model-name": self.model_name}
 
