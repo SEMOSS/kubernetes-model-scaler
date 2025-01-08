@@ -9,9 +9,11 @@ logger = logging.getLogger(__name__)
 class DeploymentMixin:
 
     def create_deployment(self):
+        logger.info(f"Deploying with Docker Image: {self.docker_image}")
         app_container = client.V1Container(
             name=self.model_name,
             image=self.docker_image,
+            image_pull_policy="Always",
             env=[
                 client.V1EnvVar(name="MODEL", value=self.model_name),
                 client.V1EnvVar(name="MODEL_REPO_ID", value=self.model_repo_id),
@@ -28,13 +30,13 @@ class DeploymentMixin:
             resources=client.V1ResourceRequirements(
                 limits={
                     "nvidia.com/gpu": "1",
-                    "cpu": "4",
-                    "memory": "16Gi",
+                    "cpu": "14",
+                    "memory": "48Gi",
                 },
                 requests={
                     "nvidia.com/gpu": "1",
-                    "cpu": "4",
-                    "memory": "16Gi",
+                    "cpu": "14",
+                    "memory": "48Gi",
                 },
             ),
             security_context=client.V1SecurityContext(
@@ -69,12 +71,16 @@ class DeploymentMixin:
 
         node_selector = {
             "cloud.google.com/gke-accelerator": "nvidia-tesla-t4",
-            "cloud.google.com/gke-nodepool": "gpu-node-pool-a",
+            "cloud.google.com/gke-nodepool": "large-gpu-pool",
         }
 
         template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(
-                labels=labels, annotations={"gke-gcsfuse/volumes": "true"}
+                labels=labels,
+                annotations={
+                    "gke-gcsfuse/volumes": "true",
+                    # "compute.googleapis.com/reservation-name": "reservation-20250108-144515",
+                },
             ),
             spec=client.V1PodSpec(
                 containers=[app_container],
@@ -84,6 +90,7 @@ class DeploymentMixin:
                     if self.image_pull_secret
                     else None
                 ),
+                terminationGracePeriodSeconds=60,
                 node_selector=node_selector,
                 tolerations=[
                     client.V1Toleration(
