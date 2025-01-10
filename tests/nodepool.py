@@ -33,7 +33,7 @@ def check_image_on_nodes(image_name, nodepool_label):
     return results
 
 
-image_name = "docker.semoss.org/genai/remote-client-server:2025-01-08-1741"
+image_name = "docker.semoss.org/genai/remote-client-server:2025-01-08-1923"
 nodepool = "large-gpu-pool"
 results = check_image_on_nodes(image_name, nodepool)
 

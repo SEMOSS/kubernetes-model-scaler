@@ -90,7 +90,6 @@ class DeploymentMixin:
                     if self.image_pull_secret
                     else None
                 ),
-                terminationGracePeriodSeconds=60,
                 node_selector=node_selector,
                 tolerations=[
                     client.V1Toleration(
