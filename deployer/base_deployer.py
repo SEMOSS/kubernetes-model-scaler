@@ -48,25 +48,6 @@ class BaseDeployer:
         self.kazoo_client = KazooClient(hosts=self.zookeeper_hosts)
         self.kazoo_client.start()
 
-    # def resolve_ids(self):
-    #     logger.info("Resolving model ids")
-    #     if self.operation == "deploy":
-    #         if not self.model_id or not self.model_name:
-    #             raise HTTPException(
-    #                 status_code=400,
-    #                 detail="model_id, model_name are required for deployment",
-    #             )
-    #     elif self.operation == "delete":
-    #         if not self.model_id and not self.model_name:
-    #             raise HTTPException(
-    #                 status_code=400,
-    #                 detail="Either model_id or model_name must be provided",
-    #             )
-    #         if not self.model_id:
-    #             self.model_id = self.get_model_id_from_name(self.model_name)
-    #         if not self.model_name:
-    #             self.model_name = self.get_model_name_from_id(self.model_id)
-
     def get_model_name_from_id(self, model_id: str) -> str:
         """
         Given a model_id, retrieve the model_name by querying Kubernetes deployments labeled with model-id.

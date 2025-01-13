@@ -30,6 +30,10 @@ class ServiceMixin:
                 namespace=self.namespace, body=service
             )
             logger.info("Service created. status='%s'" % str(api_response.status))
+
+            node_ip, node_port = self.get_service_endpoint()
+            self.nodeport_address = f"{node_ip}:{node_port}"
+            logger.info(f"Stored nodeport address: {self.nodeport_address}")
         except ApiException as e:
             logger.error("Exception when creating service: %s\n" % e)
             raise HTTPException(status_code=500, detail="Failed to create service")

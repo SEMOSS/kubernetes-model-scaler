@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import contextmanager
 from fastapi import APIRouter, HTTPException
@@ -90,9 +91,10 @@ class ZookeeperDeploymentManager:
 
 
 @start_router.post("/start")
-def start_model(request: ModelRequest):
+async def start_model(request: ModelRequest):
     logger.info(
-        f"Received request to deploy model {request.model} with an ID {request.model_id}, a repo ID of {request.model_repo_id} and a type of {request.model_type}."
+        f"Received request to deploy model {request.model} with an ID {request.model_id}, "
+        f"a repo ID of {request.model_repo_id} and a type of {request.model_type}."
     )
     deployer = KubernetesModelDeployer(
         model=request.model,
@@ -118,6 +120,16 @@ def start_model(request: ModelRequest):
             state.hpa_created = True
 
             if deployer.watch_deployment():
+                # Checking if the container is healthy..
+                is_healthy = await deployer.check_until_healthy()
+                if not is_healthy:
+                    raise Exception("Model deployment failed health check")
+
+                # Checking for when the model finally loads..
+                is_model_loaded = await deployer.check_until_model_loaded()
+                if not is_model_loaded:
+                    raise Exception("Model deployment failed model load check")
+
                 deployer.register_active_model()
             else:
                 raise Exception("Deployment monitoring failed")

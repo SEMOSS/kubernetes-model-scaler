@@ -5,6 +5,8 @@ from deployer.zookeeper_mixin import ZookeeperMixin
 from deployer.monitoring_mixin import MonitoringMixin
 from deployer.pvc_mixin import PVCMixin
 from deployer.autoscaler_mixin import AutoscalerMixin
+from deployer.health_check_mixin import HealthCheckMixin
+from deployer.model_load_mixin import ModelLoadMixin
 
 
 class KubernetesModelDeployer(
@@ -15,5 +17,7 @@ class KubernetesModelDeployer(
     ZookeeperMixin,
     MonitoringMixin,
     PVCMixin,
+    HealthCheckMixin,
+    ModelLoadMixin,
 ):
     pass
