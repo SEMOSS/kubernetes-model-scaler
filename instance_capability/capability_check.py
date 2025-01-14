@@ -40,9 +40,10 @@ class ModelCompatibilityChecker:
     # Memory multipliers for different precision types
     DTYPE_MODIFIER = {"float32": 1, "float16": 2, "bfloat16": 2, "int8": 4, "int4": 8}
 
-    def __init__(self, gpu_memory_gb: float = 16.0, dtype: str = "float16"):
+    def __init__(self, gpu_memory_gb: float, dtype: str = "float16"):
         """
         Initialize the checker with GPU specifications.
+
         Args:
             gpu_memory_gb: Available GPU memory in GB
             dtype: Model precision type (float32, float16, bfloat16, int8, int4)
@@ -75,6 +76,7 @@ class ModelCompatibilityChecker:
     ) -> Dict[str, float]:
         """
         Calculate memory requirements for the model.
+
         Returns:
             Dict with memory requirements in GB for different operations
         """
@@ -115,6 +117,7 @@ class ModelCompatibilityChecker:
         model_name = self._translate_llama2_name(model_name)
 
         try:
+            # Creating empty model for memory calculation
             model = create_empty_model(
                 model_name,
                 library_name="transformers",
@@ -122,7 +125,6 @@ class ModelCompatibilityChecker:
                 access_token=access_token,
             )
 
-            # Calculate memory requirements
             memory_req = self._calculate_memory_requirements(model)
 
             required_memory = (
@@ -164,14 +166,3 @@ class ModelCompatibilityChecker:
             )
         except Exception as e:
             raise RuntimeError(f"Error checking model compatibility: {str(e)}")
-
-
-if __name__ == "__main__":
-    checker = ModelCompatibilityChecker(gpu_memory_gb=16.0, dtype="float16")
-
-    can_run, details = checker.check_compatibility(
-        model_name="microsoft/Phi-3.5-mini-instruct", mode="inference"
-    )
-
-    print(f"Can run: {can_run}")
-    print(f"Details: {details}")
