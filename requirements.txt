@@ -7,7 +7,7 @@ python-dotenv==1.0.1
 nbstripout==0.7.1
 aiohttp
 accelerate
-
+transformers 
 torch
 torchvision
 torchaudio
