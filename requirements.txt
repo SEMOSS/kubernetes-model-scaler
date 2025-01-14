@@ -8,7 +8,6 @@ nbstripout==0.7.1
 aiohttp
 accelerate
 
---extra-index-url https://download.pytorch.org/whl/cpu
 torch
 torchvision
 torchaudio
