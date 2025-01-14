@@ -27,8 +27,4 @@ docker run -p 8000:8000 -e DOCKER_IMAGE=docker-image-name -e IMAGE_PULL_SECRET=i
 
 - `http://localhost:8000/api/stop` - Stop endpoint.
 
-- `http://localhost:8000/api/pvc/get-pvcs` - Get list of attached PVCs and the downloaded models.
-
-- `http://localhost:8000/api/pvc/remove-model` - Remove a model from the PVC.
-
-- `http://localhost:8000/api/pvc/download-model` - Download a model to the PVC.
+- `http://localhost:8000/api/can-it-run` - Check if HuggingFace model can run on the instance.
