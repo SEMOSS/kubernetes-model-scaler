@@ -1,5 +1,6 @@
 import logging
 import asyncio
+from typing import Optional
 import aiohttp
 
 logger = logging.getLogger(__name__)
@@ -23,17 +24,26 @@ class HealthCheckMixin:
             return False
 
     async def check_until_healthy(
-        self, timeout: float = 450.0, interval: float = 3.0
+        self, timeout: Optional[float] = None, interval: float = 3.0
     ) -> bool:
         """
         Poll the health endpoint until we get a 200 response or timeout.
         Args:
-            timeout: Maximum time to wait in seconds
+            timeout: Maximum time to wait in seconds (if None, determined automatically)
             interval: Time between checks in seconds
         Returns:
             bool: True if service became healthy, False if timeout reached
         """
+        if timeout is None:
+            timeout = self.get_health_check_timeout()
+
         start_time = asyncio.get_event_loop().time()
+
+        logger.info(f"Starting health check with timeout of {timeout} seconds")
+        if self.requires_download:
+            logger.info(
+                f"Extended timeout in use as model {self.model_name} requires download"
+            )
 
         while (asyncio.get_event_loop().time() - start_time) < timeout:
             if await self.perform_health_check():

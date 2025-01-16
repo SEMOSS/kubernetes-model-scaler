@@ -11,3 +11,4 @@ transformers
 torch
 torchvision
 torchaudio
+google-cloud-storage

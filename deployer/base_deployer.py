@@ -4,6 +4,8 @@ from kubernetes.client.rest import ApiException
 from fastapi import HTTPException
 from kazoo.client import KazooClient
 from config.config import ZK_HOSTS, NAMESPACE, IMAGE_PULL_SECRET, DOCKER_IMAGE, IS_DEV
+from google.cloud import storage
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -38,15 +40,14 @@ class BaseDeployer:
             logger.info("Using Incluster config")
             config.load_incluster_config()
 
-        # Verify that model_id and model_name are provided for deployment
-        # Resolve model_id and model_name if only one is provided for deletion operations
-        # self.resolve_ids()
-
         logger.info(
             f"Initializing BaseDeployer with namespace={self.namespace}, zookeeper_hosts={self.zookeeper_hosts}, image_pull_secret={self.image_pull_secret}"
         )
         self.kazoo_client = KazooClient(hosts=self.zookeeper_hosts)
         self.kazoo_client.start()
+
+        self.requires_download: Optional[bool] = None
+        self.storage_client = storage.Client()
 
     def get_model_name_from_id(self, model_id: str) -> str:
         """

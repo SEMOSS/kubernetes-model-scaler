@@ -106,6 +106,8 @@ async def start_model(request: ModelRequest):
 
     zk_manager = ZookeeperDeploymentManager()
 
+    deployer.check_model_files_exist()
+
     with zk_manager.deployment_context(deployer) as state:
         try:
             deployer.create_pvc()

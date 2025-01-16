@@ -7,6 +7,7 @@ from deployer.pvc_mixin import PVCMixin
 from deployer.autoscaler_mixin import AutoscalerMixin
 from deployer.health_check_mixin import HealthCheckMixin
 from deployer.model_load_mixin import ModelLoadMixin
+from deployer.model_files_mixin import ModelFilesMixin
 
 
 class KubernetesModelDeployer(
@@ -19,5 +20,6 @@ class KubernetesModelDeployer(
     PVCMixin,
     HealthCheckMixin,
     ModelLoadMixin,
+    ModelFilesMixin,
 ):
     pass
