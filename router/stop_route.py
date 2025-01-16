@@ -8,7 +8,7 @@ stop_router = APIRouter()
 
 
 @stop_router.post("/stop")
-def stop_model(model_id: str = None, model: str = None):
+async def stop_model(model_id: str = None, model: str = None):
     """
     Stops the model deployment by deleting the Kubernetes deployment, service, and zookeeper entry.
     Accepts either model_id or model_name to identify the model.
@@ -32,6 +32,7 @@ def stop_model(model_id: str = None, model: str = None):
         deployer.delete_podmonitoring()
         deployer.delete_hpa()
         deployer.unregister_active_model()
+        await deployer.delete_deployment_status()
     except Exception as e:
         logger.error(f"Error stopping model {model}/{model_id}: {e}")
         raise HTTPException(

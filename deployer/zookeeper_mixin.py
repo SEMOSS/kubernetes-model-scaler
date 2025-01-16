@@ -12,6 +12,7 @@ class ZookeeperMixin:
         """
         node_ip, node_port = self.get_service_endpoint()
         endpoint = f"{node_ip}:{node_port}"
+        self.address = endpoint
         data = {"ip": endpoint, "model_name": self.model_name}
         return json.dumps(data).encode("utf-8")
 
