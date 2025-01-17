@@ -18,6 +18,7 @@ class RedisMixin:
             "model_name": str(self.model_name),
             "model_repo_id": str(self.model_repo_id),
             "model_type": str(self.model_type),
+            "semoss_id": str(self.model_id),
             "address": str(self.address),
             "start_time": pendulum.now("America/New_York").isoformat(),
             "last_request": pendulum.now("America/New_York").isoformat(),

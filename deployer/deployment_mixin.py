@@ -18,6 +18,7 @@ class DeploymentMixin:
                 client.V1EnvVar(name="MODEL", value=self.model_name),
                 client.V1EnvVar(name="MODEL_REPO_ID", value=self.model_repo_id),
                 client.V1EnvVar(name="MODEL_TYPE", value=self.model_type),
+                client.V1EnvVar(name="SEMOSS_ID", value=self.model_id),
             ],
             ports=[client.V1ContainerPort(container_port=8888)],
             volume_mounts=[
