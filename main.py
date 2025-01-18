@@ -11,6 +11,7 @@ from router.start_route import start_router
 from router.stop_route import stop_router
 from router.can_it_run_route import instance_check_router
 from router.shutdown_lock_route import shutdown_lock_router
+from router.zk_info_route import zk_info_router
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ app.include_router(start_router, prefix="/api")
 app.include_router(stop_router, prefix="/api")
 app.include_router(instance_check_router, prefix="/api")
 app.include_router(shutdown_lock_router, prefix="/api")
+app.include_router(zk_info_router, prefix="/api")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
