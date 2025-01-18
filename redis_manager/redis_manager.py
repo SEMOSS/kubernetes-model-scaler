@@ -2,28 +2,26 @@ from redis import asyncio as aioredis
 import logging
 import os
 from typing import Optional
-from contextlib import asynccontextmanager
 
 
 class RedisManager:
-    """
-    Manages Redis connections and operations for the KMS.
-    """
+    _instance = None
+    _initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(RedisManager, cls).__new__(cls)
+        return cls._instance
 
     def __init__(self):
-        self._redis: Optional[aioredis.Redis] = None
-        self._host = os.getenv("REDIS_HOST", "redis.semoss.svc.cluster.local")
-        # self._host = "127.0.0.1"
-        self._port = int(os.getenv("REDIS_PORT", "6379"))
-        self.logger = logging.getLogger(__name__)
+        if not RedisManager._initialized:
+            self._redis: Optional[aioredis.Redis] = None
+            self._host = os.getenv("REDIS_HOST", "redis.semoss.svc.cluster.local")
+            self._port = int(os.getenv("REDIS_PORT", "6379"))
+            self.logger = logging.getLogger(__name__)
+            RedisManager._initialized = True
 
     async def connect(self) -> None:
-        """
-        Establishes connection to Redis if not already connected.
-
-        Raises:
-            ConnectionError: If connection to Redis fails
-        """
         if self._redis is not None:
             self.logger.warning("Redis connection already exists")
             return
@@ -38,7 +36,6 @@ class RedisManager:
                 retry_on_timeout=True,
                 health_check_interval=30,
             )
-            # Test the connection
             await self._redis.ping()
             self.logger.info("Successfully connected to Redis")
         except Exception as e:
@@ -47,9 +44,6 @@ class RedisManager:
             raise ConnectionError(f"Could not connect to Redis: {str(e)}")
 
     async def disconnect(self) -> None:
-        """
-        Closes the Redis connection if it exists.
-        """
         if self._redis is not None:
             try:
                 self.logger.info("Closing Redis connection")
@@ -59,59 +53,31 @@ class RedisManager:
                 self.logger.error(f"Error closing Redis connection: {str(e)}")
             finally:
                 self._redis = None
+                RedisManager._initialized = False
 
     @property
     def is_connected(self) -> bool:
-        """
-        Checks if Redis client exists and is connected.
-        Returns:
-            bool: True if connected, False otherwise
-        """
         return self._redis is not None and self._redis.connection is not None
 
-    @asynccontextmanager
-    async def get_connection(self):
-        """
-        Context manager for getting a Redis connection.
-        Ensures connection is established before yielding.
-        Yields:
-            aioredis.Redis: Active Redis connection
-        Raises:
-            ConnectionError: If Redis is not connected and connection attempt fails
-        """
+    async def update_model_lock(self, model_id: str, lock: str) -> None:
+        deployment_key = f"{model_id}:deployment"
+
         if not self.is_connected:
             await self.connect()
 
         try:
-            yield self._redis
-        except Exception as e:
-            self.logger.error(f"Error during Redis operation: {str(e)}")
+            if not await self._redis.exists(deployment_key):
+                raise KeyError(f"No deployment found for model {model_id}")
+
+            await self._redis.hset(deployment_key, "shutdown_lock", lock)
+            self.logger.info(
+                f"Successfully updated shutdown_lock to {lock} for model {model_id}"
+            )
+        except ConnectionError as e:
+            self.logger.error(
+                f"Failed to connect to Redis while updating model lock: {e}"
+            )
             raise
-
-
-# Example usage:
-async def example_usage():
-    redis_manager = RedisManager()
-
-    # Method 1: Direct connection management
-    try:
-        await redis_manager.connect()
-        # Use redis_manager._redis for operations
-        await redis_manager.disconnect()
-    except ConnectionError as e:
-        print(f"Failed to connect: {e}")
-
-    # Method 2: Using context manager (preferred)
-    try:
-        async with redis_manager.get_connection() as redis:
-            await redis.set("test_key", "test_value")
-            value = await redis.get("test_key")
-            print(f"Retrieved value: {value}")
-    except ConnectionError as e:
-        print(f"Failed to connect: {e}")
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(example_usage())
+        except Exception as e:
+            self.logger.error(f"Error updating model lock in Redis: {e}")
+            raise

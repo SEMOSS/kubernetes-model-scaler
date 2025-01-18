@@ -44,8 +44,9 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
       volumes:
-      - name: redis-config
-        configMap:
-          name: redis-config
-      - name: redis-data
-        emptyDir: {}
+        - name: redis-config
+          configMap:
+            name: redis-config
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-data-pvc

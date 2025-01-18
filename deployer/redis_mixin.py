@@ -27,12 +27,12 @@ class RedisMixin:
         }
 
         try:
-            async with redis_manager.get_connection() as redis:
-                string_mapping = {k: str(v) for k, v in mapping.items()}
-                await redis.hset(deployment_key, mapping=string_mapping)
-                logger.info(
-                    f"Successfully updated deployment status for {self.model_id}"
-                )
+            if not redis_manager.is_connected:
+                await redis_manager.connect()
+
+            string_mapping = {k: str(v) for k, v in mapping.items()}
+            await redis_manager._redis.hset(deployment_key, mapping=string_mapping)
+            logger.info(f"Successfully updated deployment status for {self.model_id}")
         except ConnectionError as e:
             logger.error(f"Failed to connect to Redis: {e}")
             raise
@@ -48,11 +48,11 @@ class RedisMixin:
         deployment_key = f"{self.model_id}:deployment"
 
         try:
-            async with redis_manager.get_connection() as redis:
-                await redis.delete(deployment_key)
-                logger.info(
-                    f"Successfully deleted deployment status for {self.model_id}"
-                )
+            if not redis_manager.is_connected:
+                await redis_manager.connect()
+
+            await redis_manager._redis.delete(deployment_key)
+            logger.info(f"Successfully deleted deployment status for {self.model_id}")
         except ConnectionError as e:
             logger.error(f"Failed to connect to Redis: {e}")
             raise
