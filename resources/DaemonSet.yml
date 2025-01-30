@@ -20,7 +20,7 @@ spec:
         effect: "NoSchedule"
       containers:
       - name: rcs-image-puller
-        image: docker.semoss.org/genai/remote-client-server:2025-01-17-1744
+        image: docker.semoss.org/genai/remote-client-server:2025-01-28-1624
         command: ["sh", "-c", "while true; do sleep 3600; done"]
         resources:
           requests:

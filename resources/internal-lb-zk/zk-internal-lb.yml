@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-internal-lb
+  namespace: semoss
+  annotations:
+    networking.gke.io/load-balancer-type: "Internal"
+    networking.gke.io/subnet-name: "usgcpadvnpd2"
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 2181
+      targetPort: 2181
+      protocol: TCP
+      name: client
+  selector:
+    app: zookeeper
+  loadBalancerSourceRanges:
+    - 10.218.11.160/27

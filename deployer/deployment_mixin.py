@@ -23,10 +23,9 @@ class DeploymentMixin:
             ports=[client.V1ContainerPort(container_port=8888)],
             volume_mounts=[
                 client.V1VolumeMount(
-                    name="gcs-fuse-csi-ephemeral",
+                    name="model-storage",
                     mount_path="/app/model_files",
-                    mount_propagation="HostToContainer",
-                )
+                ),
             ],
             resources=client.V1ResourceRequirements(
                 limits={
@@ -45,28 +44,12 @@ class DeploymentMixin:
             ),
         )
 
-        # Configuring the CSI volume
         volume = client.V1Volume(
-            name="gcs-fuse-csi-ephemeral",
-            csi=client.V1CSIVolumeSource(
-                driver="gcsfuse.csi.storage.gke.io",
-                volume_attributes={
-                    "bucketName": "semoss-model-files",
-                    "gcsfuseLoggingSeverity": "warning",
-                    "mountOptions": "implicit-dirs",
-                    "only-dir": f"{self.model_name}",
-                },
+            name="model-storage",
+            persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                claim_name="filestore-cfg-pvc-rwm"
             ),
         )
-
-        additional_env = [
-            client.V1EnvVar(name="GCSFUSE_DEBUG", value="true"),
-            client.V1EnvVar(name="GCSFUSE_DEBUG_GCS", value="true"),
-            client.V1EnvVar(name="GCSFUSE_DEBUG_FUSE", value="true"),
-            client.V1EnvVar(name="GCSFUSE_DEBUG_HTTP", value="true"),
-        ]
-
-        app_container.env.extend(additional_env)
 
         labels = {"model-id": self.model_id, "model-name": self.model_name}
 
@@ -78,10 +61,6 @@ class DeploymentMixin:
         template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(
                 labels=labels,
-                annotations={
-                    "gke-gcsfuse/volumes": "true",
-                    # "compute.googleapis.com/reservation-name": "reservation-20250108-144515",
-                },
             ),
             spec=client.V1PodSpec(
                 containers=[app_container],
@@ -130,12 +109,10 @@ class DeploymentMixin:
         """
         api_instance = client.AppsV1Api()
         try:
-            # Add debug logging
             logger.info(
                 f"Attempting to delete deployment {self.model_name} in namespace {self.namespace}"
             )
 
-            # List deployments in namespace first
             deployments = api_instance.list_namespaced_deployment(
                 namespace=self.namespace
             )

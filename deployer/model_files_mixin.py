@@ -35,7 +35,7 @@ class ModelFilesMixin:
         if self.requires_download is None:
             self.check_model_files_exist()
 
-        base_timeout = 450.0
-        download_timeout = 1800.0
+        base_timeout = 2700.0
+        download_timeout = 3600.0
 
         return download_timeout if self.requires_download else base_timeout
