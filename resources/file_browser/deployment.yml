@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: filebrowser
+  namespace: semoss
+  labels:
+    app: filebrowser
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: filebrowser
+  template:
+    metadata:
+      labels:
+        app: filebrowser
+    spec:
+      volumes:
+        - name: model-storage
+          persistentVolumeClaim:
+            claimName: filestore-cfg-pvc-rwm
+        - name: filebrowser-config
+          emptyDir: {}
+      containers:
+        - name: filebrowser
+          image: filebrowser/filebrowser:v2
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: model-storage
+              mountPath: /srv
+            - name: filebrowser-config
+              mountPath: /database
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          securityContext:
+            runAsUser: 0
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      serviceAccountName: fuse-ksa
