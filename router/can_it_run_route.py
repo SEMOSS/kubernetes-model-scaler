@@ -10,7 +10,6 @@ instance_check_router = APIRouter()
 
 class ModelCheckRequest(BaseModel):
     model_id: str
-    gpu_memory_gb: Optional[float] = 16.0
     dtype: Optional[str] = "float16"
 
 
@@ -35,18 +34,13 @@ async def check_instance_compatibility(request: ModelCheckRequest):
             - 500: Unexpected server error
     """
     try:
-        checker = ModelCompatibilityChecker(
-            gpu_memory_gb=request.gpu_memory_gb, dtype=request.dtype
-        )
+        checker = ModelCompatibilityChecker(dtype=request.dtype)
 
         can_run, details = checker.check_compatibility(request.model_id)
 
         return {
             "can_run": can_run,
-            "model_id": request.model_id,
-            "gpu_memory_gb": request.gpu_memory_gb,
-            "dtype": request.dtype,
-            **details,
+            **details.model_dump(),
         }
 
     except ValueError as e:

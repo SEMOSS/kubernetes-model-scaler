@@ -108,6 +108,10 @@ async def start_model(request: ModelRequest):
 
     deployer.check_model_files_exist()
 
+    # Checking if model can run on available instance and selecting the node pool
+    # This raises an exception if the model is incompatible or no nodes are available
+    deployer.get_capability()
+
     with zk_manager.deployment_context(deployer) as state:
         try:
             deployer.create_pvc()

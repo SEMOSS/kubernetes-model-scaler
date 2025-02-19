@@ -10,6 +10,23 @@ class DeploymentMixin:
 
     def create_deployment(self):
         logger.info(f"Deploying with Docker Image: {self.docker_image}")
+
+        # This is set in the capability_mixin
+        node_pool = self.node_pool
+        use_gpu = node_pool.specs.gpu_type is not None
+        if use_gpu:
+            spec_request = {
+                "nvidia.com/gpu": "1",
+                "cpu": str(node_pool.specs.vcpus),
+                "memory": f"{node_pool.specs.memory_gb}Gi",
+            }
+        else:
+            spec_request = {
+                "cpu": str(node_pool.specs.vcpus),
+                "memory": f"{node_pool.specs.memory_gb}Gi",
+            }
+        node_pool_name = node_pool.node_pool_name
+
         app_container = client.V1Container(
             name=self.model_name,
             image=self.docker_image,
@@ -19,6 +36,12 @@ class DeploymentMixin:
                 client.V1EnvVar(name="MODEL_REPO_ID", value=self.model_repo_id),
                 client.V1EnvVar(name="MODEL_TYPE", value=self.model_type),
                 client.V1EnvVar(name="SEMOSS_ID", value=self.model_id),
+                client.V1EnvVar(
+                    name="PYTORCH_CUDA_ALLOC_CONF",
+                    value="max_split_size_mb:64,expandable_segments:True,garbage_collection_threshold:0.8",
+                ),
+                client.V1EnvVar(name="PYTORCH_CUDA_MEMORY_ALLOCATOR", value="native"),
+                client.V1EnvVar(name="CUDA_VISIBLE_DEVICES", value="0"),
             ],
             ports=[client.V1ContainerPort(container_port=8888)],
             volume_mounts=[
@@ -28,16 +51,8 @@ class DeploymentMixin:
                 ),
             ],
             resources=client.V1ResourceRequirements(
-                limits={
-                    "nvidia.com/gpu": "1",
-                    "cpu": "14",
-                    "memory": "48Gi",
-                },
-                requests={
-                    "nvidia.com/gpu": "1",
-                    "cpu": "14",
-                    "memory": "48Gi",
-                },
+                limits=spec_request,
+                requests=spec_request,
             ),
             security_context=client.V1SecurityContext(
                 privileged=True, capabilities=client.V1Capabilities(add=["SYS_ADMIN"])
@@ -54,9 +69,16 @@ class DeploymentMixin:
         labels = {"model-id": self.model_id, "model-name": self.model_name}
 
         node_selector = {
-            "cloud.google.com/gke-accelerator": "nvidia-tesla-t4",
-            "cloud.google.com/gke-nodepool": "t4-gpu-pool",
+            "cloud.google.com/gke-nodepool": node_pool_name,
         }
+
+        tolerations = []
+        if use_gpu:
+            tolerations.append(
+                client.V1Toleration(
+                    key="nvidia.com/gpu", operator="Exists", effect="NoSchedule"
+                )
+            )
 
         template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(
@@ -71,11 +93,7 @@ class DeploymentMixin:
                     else None
                 ),
                 node_selector=node_selector,
-                tolerations=[
-                    client.V1Toleration(
-                        key="nvidia.com/gpu", operator="Exists", effect="NoSchedule"
-                    )
-                ],
+                tolerations=tolerations if tolerations else None,
                 service_account_name="fuse-ksa",
             ),
         )
@@ -98,7 +116,7 @@ class DeploymentMixin:
             api_response = api_instance.create_namespaced_deployment(
                 namespace=self.namespace, body=deployment
             )
-            logger.info("Deployment created. status='%s'" % str(api_response.status))
+            logger.info("Deployment created")
         except ApiException as e:
             logger.error("Exception when creating deployment: %s\n" % e)
             raise HTTPException(status_code=500, detail="Failed to create deployment")

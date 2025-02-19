@@ -2,4 +2,4 @@
 Use this to verify the version of the application after deployment.
 """
 
-version = "1.0.2"
+version = "2.0.0"
