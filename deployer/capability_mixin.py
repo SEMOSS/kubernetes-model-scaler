@@ -27,7 +27,7 @@ class CapabilityMixin:
                     },
                 )
 
-            node_pool_selector = NodePoolSelector(details)
+            node_pool_selector = NodePoolSelector(details, self.model_type)
             node_pool = node_pool_selector.select_node_pool()
             if not node_pool:
                 raise HTTPException(
