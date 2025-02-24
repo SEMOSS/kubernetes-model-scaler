@@ -1,0 +1,32 @@
+# DaemonSet for CPU Pool
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: rcs-image-puller-cpu
+  namespace: semoss
+spec:
+  selector:
+    matchLabels:
+      name: rcs-image-puller
+      pool: cpu
+  template:
+    metadata:
+      labels:
+        name: rcs-image-puller
+        pool: cpu
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-nodepool: "cpu-sapphire-pool"
+      containers:
+      - name: rcs-image-puller
+        image: docker.semoss.org/genai/remote-client-server:2025-02-21-1936
+        command: ["sh", "-c", "while true; do sleep 3600; done"]
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "100Mi"
+          limits:
+            cpu: "100m"
+            memory: "100Mi"
+      imagePullSecrets:
+      - name: CHANGE-ME
