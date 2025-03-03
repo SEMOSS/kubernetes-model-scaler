@@ -113,46 +113,52 @@ class DeployerConfig:
 
         else:
             # Production mode - try mounted kubeconfig first then fall back to in-cluster config
-            if self.kubeconfig_path and os.path.exists(self.kubeconfig_path):
-                # Use mounted kubeconfig for multi-cluster support
-                logger.info(f"Using mounted kubeconfig at {self.kubeconfig_path}")
+            # if self.kubeconfig_path and os.path.exists(self.kubeconfig_path):
+            #     # Use mounted kubeconfig for multi-cluster support
+            #     logger.info(f"Using mounted kubeconfig at {self.kubeconfig_path}")
 
-                try:
-                    if cluster_context:
-                        # Validating the context exists
-                        self._validate_context_exists(
-                            cluster_context, self.kubeconfig_path
-                        )
+            #     try:
+            #         if cluster_context:
+            #             # Validating the context exists
+            #             self._validate_context_exists(
+            #                 cluster_context, self.kubeconfig_path
+            #             )
 
-                        # Load specific context from the kubeconfig
-                        logger.info(
-                            f"Using context {cluster_context} from mounted kubeconfig"
-                        )
-                        config.load_kube_config(
-                            config_file=self.kubeconfig_path, context=cluster_context
-                        )
-                    else:
-                        # Using default context from the kubeconfig
-                        logger.info("Using default context from mounted kubeconfig")
-                        config.load_kube_config(config_file=self.kubeconfig_path)
+            #             # Load specific context from the kubeconfig
+            #             logger.info(
+            #                 f"Using context {cluster_context} from mounted kubeconfig"
+            #             )
+            #             config.load_kube_config(
+            #                 config_file=self.kubeconfig_path, context=cluster_context
+            #             )
+            #         else:
+            #             # Using default context from the kubeconfig
+            #             logger.info("Using default context from mounted kubeconfig")
+            #             config.load_kube_config(config_file=self.kubeconfig_path)
 
-                    # Log the active context
-                    contexts, active = config.list_kube_config_contexts(
-                        config_file=self.kubeconfig_path
-                    )
-                    logger.info(f"Active Kubernetes context: {active['name']}")
-                    logger.info(
-                        f"Available contexts: {[ctx['name'] for ctx in contexts]}"
-                    )
+            #         # Log the active context
+            #         contexts, active = config.list_kube_config_contexts(
+            #             config_file=self.kubeconfig_path
+            #         )
+            #         logger.info(f"Active Kubernetes context: {active['name']}")
+            #         logger.info(
+            #             f"Available contexts: {[ctx['name'] for ctx in contexts]}"
+            #         )
 
-                except Exception as e:
-                    logger.error(f"Error loading mounted kubeconfig: {e}")
-                    logger.info("Falling back to in-cluster config")
-                    self._load_incluster_config()
-            else:
-                # No mounted kubeconfig use in-cluster config
-                logger.info("No mounted kubeconfig found, using in-cluster config")
-                self._load_incluster_config()
+            #     except Exception as e:
+            #         logger.error(f"Error loading mounted kubeconfig: {e}")
+            #         logger.info("Falling back to in-cluster config")
+            #         self._load_incluster_config()
+            # else:
+            #     # No mounted kubeconfig use in-cluster config
+            #     logger.info("No mounted kubeconfig found, using in-cluster config")
+            #     self._load_incluster_config()
+            try:
+                config.load_incluster_config()
+                logger.info("Successfully loaded in-cluster config")
+            except Exception as e:
+                logger.error(f"Failed to load in-cluster config: {e}")
+                raise
 
     def _load_incluster_config(self):
         """Helper method to load in-cluster config with proper error handling"""
