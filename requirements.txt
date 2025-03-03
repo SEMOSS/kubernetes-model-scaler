@@ -13,4 +13,5 @@ torchvision
 torchaudio
 google-cloud-storage
 redis[hiredis]
-pendulum
+# pendulum
+kserve

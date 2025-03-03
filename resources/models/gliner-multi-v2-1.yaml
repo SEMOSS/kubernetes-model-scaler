@@ -1,0 +1,25 @@
+apiVersion: "serving.kserve.io/v1beta1"
+kind: "InferenceService"
+metadata:
+  name: "gliner-multi-v2-1"
+  namespace: "huggingface-models"
+  annotations:
+    deployment.kubernetes.io/revision: "2" 
+spec:
+  predictor:
+    serviceAccountName: kube-model-deployer-sa
+    containers:
+    - name: kserve-container
+      image: docker.semoss.org/genai/predictors/gliner:2025-03-03-1732
+      env:
+        - name: MODEL_ID
+          value: urchade/gliner_multi-v2.1
+        - name: MODEL_NAME
+          value: gliner-multi-v2-1
+      resources:
+        requests:
+          memory: "10Gi"
+          cpu: "1"
+        limits:
+          memory: "14Gi"
+          cpu: "2"

@@ -8,7 +8,7 @@ from deployer.autoscaler_mixin import AutoscalerMixin
 from deployer.health_check_mixin import HealthCheckMixin
 from deployer.model_load_mixin import ModelLoadMixin
 from deployer.model_files_mixin import ModelFilesMixin
-from deployer.redis_mixin import RedisMixin
+# from deployer.redis_mixin import RedisMixin
 from deployer.capability_mixin import CapabilityMixin
 
 
@@ -23,7 +23,7 @@ class KubernetesModelDeployer(
     HealthCheckMixin,
     ModelLoadMixin,
     ModelFilesMixin,
-    RedisMixin,
+    # RedisMixin,
     CapabilityMixin,
 ):
     pass

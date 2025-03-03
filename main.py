@@ -14,6 +14,8 @@ from router.shutdown_lock_route import shutdown_lock_router
 from router.zk_info_route import zk_info_router
 from router.deploy_daemon_set_route import deploy_daemon_set_router
 from router.destroy_daemon_set_route import destroy_daemon_set_router
+from router.start_route_v2 import start_router_v2
+from router.stop_route_v2 import stop_router_v2
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,8 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(health_check_router, prefix="/api")
 app.include_router(version_router, prefix="/api")
 app.include_router(start_router, prefix="/api")
+app.include_router(start_router_v2, prefix="/api/v2")
+app.include_router(stop_router_v2, prefix="/api/v2")
 app.include_router(stop_router, prefix="/api")
 app.include_router(instance_check_router, prefix="/api")
 app.include_router(shutdown_lock_router, prefix="/api")
