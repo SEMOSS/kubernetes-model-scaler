@@ -137,7 +137,7 @@ async def start_model(request: ModelRequest):
                     raise Exception("Model deployment failed model load check")
 
                 deployer.register_active_model()
-                await deployer.update_deployment_status()
+                # await deployer.update_deployment_status()
             else:
                 raise Exception("Deployment monitoring failed")
 
