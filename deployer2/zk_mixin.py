@@ -72,28 +72,29 @@ class ZookeeperMixin:
             logger.error(f"Unexpected error getting InferenceService endpoint: {e}")
             return None, None
 
-    def _create_zk_data(self) -> bytes:
+    def _create_zk_data(self, stage: str) -> bytes:
         """
         Creates a JSON object containing the endpoint address and model name.
-        For KServe, we use the InferenceService URL.
+        For KServe, we use the LoadBalancer IP for cross-cluster communication.
+        Raises an exception if no cross-cluster compatible endpoint is available.
         """
-        host, port = self.get_inference_service_endpoint()
+        if stage == "active":
+            lb_ip = self.get_load_balancer_ip(wait=True, timeout=180)
 
-        if host is None:
-            # Fallback to LoadBalancer if available
-            lb_ip = self.get_load_balancer_ip(wait=True, timeout=60)
-            if lb_ip:
-                endpoint = f"{lb_ip}:80"
-            else:
-                # Last resort: construct the internal service DNS name
-                # Format: <model-name>-predictor-default.<namespace>.svc.cluster.local
-                endpoint = f"{self.model_name}-predictor-default.{self.model_namespace}.svc.cluster.local:8080"
+            if not lb_ip:
+                error_msg = f"No LoadBalancer IP found for model {self.model_name}. Cannot register model for cross-cluster access."
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
+
+            endpoint = f"{lb_ip}:80"
+            logger.info(f"Using LoadBalancer endpoint for ZooKeeper: {endpoint}")
+
+            self.address = endpoint
+        elif stage == "warming":
+            endpoint = "WARMING"
         else:
-            endpoint = f"{host}:{port}"
+            raise ValueError(f"Invalid stage: {stage}")
 
-        self.address = endpoint
-
-        # Enhanced data structure with KServe-specific information
         data = {
             "ip": endpoint,
             "model_name": self.model_name,
@@ -136,7 +137,7 @@ class ZookeeperMixin:
         try:
             path = f"/models/warming/{self.model_id}"
             self.kazoo_client.ensure_path(path)
-            zk_data = self._create_zk_data()
+            zk_data = self._create_zk_data("warming")
             self.kazoo_client.set(path, zk_data)
             logger.info(
                 f"Zookeeper is tracking warming model {self.model_id} ({self.model_name}) at {path}"
@@ -167,7 +168,7 @@ class ZookeeperMixin:
         try:
             path = f"/models/active/{self.model_id}"
             self.kazoo_client.ensure_path(path)
-            zk_data = self._create_zk_data()
+            zk_data = self._create_zk_data("active")
             self.kazoo_client.set(path, zk_data)
             logger.info(
                 f"Zookeeper is tracking active model {self.model_id} ({self.model_name}) at {path}"
