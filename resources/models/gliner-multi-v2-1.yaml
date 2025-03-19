@@ -10,12 +10,16 @@ spec:
     serviceAccountName: kube-model-deployer-sa
     containers:
     - name: kserve-container
-      image: docker.semoss.org/genai/cfg-ms-models/gliner-cpu:latest
+      image: docker.semoss.org/genai/cfg-ms-models/gliner-cpu:2025-03-19-1251
       env:
         - name: MODEL_ID
           value: urchade/gliner_multi-v2.1
         - name: MODEL_NAME
           value: gliner-multi-v2-1
+        - name: MODEL_FILES_PATH
+          value: "/mnt/models"
+        - name: STORAGE_URI
+          value: "oci://docker.semoss.org/genai/cfg-ms-models/oci/gliner_multi-v2-1:2025-03-18-1737"
       resources:
         requests:
           memory: "10Gi"
