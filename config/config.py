@@ -16,3 +16,7 @@ IS_DEV = os.getenv("IS_DEV", "false").lower()
 STANDARD_CLUSTER = os.getenv("STANDARD_CLUSTER", "standard")
 AUTOPILOT_CLUSTER = os.getenv("AUTOPILOT_CLUSTER", "autopilot")
 KUBECONFIG_PATH = os.getenv("KUBECONFIG_PATH", "/app/kubeconfig/config")
+
+RESOURCE_BUCKET_NAME = os.getenv(
+    "RESOURCE_BUCKET_NAME", "model-service-deployment-resources"
+)

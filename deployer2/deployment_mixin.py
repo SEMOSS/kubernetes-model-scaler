@@ -1,9 +1,11 @@
 import logging
 import os
+import tempfile
 import yaml
 from kubernetes import client
 from kubernetes.client.rest import ApiException
 from fastapi import HTTPException
+from cloud.gcp.storage_manager import StorageManager
 
 logger = logging.getLogger(__name__)
 
@@ -13,13 +15,30 @@ class DeploymentMixin:
     def apply_yaml(self):
         try:
             namespace = self.model_namespace
-            yaml_path = self.resources_path / f"{self.model_name}.yaml"
 
-            if not os.path.exists(yaml_path):
-                raise FileNotFoundError(f"YAML file {yaml_path} not found")
+            # Create temporary file for storing the downloaded YAML
+            with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as temp_file:
+                temp_path = temp_file.name
 
-            with open(yaml_path, "r") as file:
-                resource_dict = yaml.safe_load(file)
+            try:
+                storage_manager = StorageManager()
+                yaml_content = storage_manager.download_yaml(self.model_name)
+                resource_dict = yaml.safe_load(yaml_content)
+
+                with open(temp_path, "w") as f:
+                    f.write(yaml_content)
+
+                logger.info(f"Downloaded and parsed YAML for model {self.model_name}")
+            except Exception as e:
+                logger.error(f"Failed to download or parse YAML: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to obtain YAML for model {self.model_name}: {str(e)}",
+                )
+            finally:
+                # Clean up temp file
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
 
             api_version = resource_dict.get("apiVersion")
             kind = resource_dict.get("kind")
@@ -76,7 +95,7 @@ class DeploymentMixin:
                 status_code=500, detail=f"Failed to apply YAML: {str(e)}"
             )
         except yaml.YAMLError as e:
-            logger.error(f"Invalid YAML in {yaml_path}: {e}")
+            logger.error(f"Invalid YAML for model {self.model_name}: {e}")
             raise HTTPException(status_code=400, detail=f"Invalid YAML: {str(e)}")
         except Exception as e:
             logger.error(f"Unexpected error when applying YAML: {e}")
