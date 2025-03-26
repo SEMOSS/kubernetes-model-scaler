@@ -32,7 +32,7 @@ class BaseDeployer:
         self.model_id = model_id  # The SEMOSS UUID for the model
         self.model_repo_id = model_repo_id  # The HuggingFace model repo ID
         self.model_type = model_type  # The model type
-        if IS_DEV == "true":
+        if IS_DEV:
             logger.info("Using dev config")
             # If you are using this locally you will need to change this to match your kubeconfig
             config.load_kube_config(context="standard")

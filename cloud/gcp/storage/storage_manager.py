@@ -2,9 +2,10 @@ import logging
 import os
 from pathlib import Path
 from google.cloud import storage
-from google.oauth2 import service_account
+from google.oauth2.service_account import Credentials
 from fastapi import HTTPException
 from config.config import RESOURCE_BUCKET_NAME, IS_DEV
+
 
 logger = logging.getLogger(__name__)
 
@@ -15,14 +16,14 @@ class StorageManager:
     Handles authentication and operations like downloading YAML files.
     """
 
-    def __init__(self):
+    def __init__(self, creds: Credentials = None):
         """
         Initialize the GCP Storage Manager with the specified bucket.
-
         Args:
             bucket_name (str): Name of the GCS bucket containing deployment resources
         """
-        self.is_dev = True if IS_DEV == "true" else False
+        self.is_dev = IS_DEV
+        self.creds = creds
         self.bucket_name = RESOURCE_BUCKET_NAME
         self.client = self._initialize_client()
         self.bucket = self.client.bucket(self.bucket_name)
@@ -30,36 +31,13 @@ class StorageManager:
     def _initialize_client(self):
         """
         Initialize the Google Cloud Storage client with appropriate credentials.
-
         Returns:
             storage.Client: Authenticated GCS client
         """
         try:
-            # First check if environment has credentials set (for k8s deployment)
-            # Use this if you are setting a kubernetes secret with the credentials
-            if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ:
-                logger.info(
-                    "Using GOOGLE_APPLICATION_CREDENTIALS environment variable for authentication"
-                )
-                return storage.Client()
+            if self.creds:
+                return storage.Client(credentials=self.credentials)
 
-            # Check for service account JSON file (for local development)
-            # Credentials file should be located in root of server
-            if self.is_dev:
-                creds_path = Path(__file__).parent.parent / "credentials.json"
-                if creds_path.exists():
-                    logger.info(f"Using service account credentials from: {creds_path}")
-                    credentials = service_account.Credentials.from_service_account_file(
-                        creds_path
-                    )
-                    return storage.Client(credentials=credentials)
-                else:
-                    logger.info(
-                        "No service account credentials found for local development"
-                    )
-
-            # Default credentials (for GKE with workload identity in k8s)
-            logger.info("Using default credentials (workload identity or ADC)")
             return storage.Client()
 
         except Exception as e:

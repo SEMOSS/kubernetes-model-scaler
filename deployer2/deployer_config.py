@@ -14,6 +14,7 @@ from config.config import (
     AUTOPILOT_CLUSTER,
     KUBECONFIG_PATH,
 )
+from cloud import get_cloud_manager
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,9 @@ class DeployerConfig:
         self.kazoo_client = KazooClient(hosts=self.zookeeper_hosts)
         self.kazoo_client.start()
 
+        # Initialize cloud manager based on the configured provider
+        self.cloud_manager = get_cloud_manager()
+
     def initialize_kubernetes_client(self, cluster_context=None):
         """
         Initialize Kubernetes client with the appropriate configuration.
@@ -87,7 +91,7 @@ class DeployerConfig:
         Args:
             cluster_context (str, optional): Kubernetes cluster context to use
         """
-        if IS_DEV == "true":
+        if IS_DEV:
             # Development mode - use local kubeconfig
             logger.info("Using dev config")
 
@@ -219,7 +223,7 @@ class DeployerConfig:
 
             # For production with mounted kubeconfig, validate the context exists
             if (
-                not IS_DEV == "true"
+                not IS_DEV
                 and self.kubeconfig_path
                 and os.path.exists(self.kubeconfig_path)
             ):
@@ -245,7 +249,7 @@ class DeployerConfig:
         try:
             # For production with mounted kubeconfig
             if (
-                not IS_DEV == "true"
+                not IS_DEV
                 and self.kubeconfig_path
                 and os.path.exists(self.kubeconfig_path)
             ):

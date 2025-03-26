@@ -5,7 +5,6 @@ import yaml
 from kubernetes import client
 from kubernetes.client.rest import ApiException
 from fastapi import HTTPException
-from cloud.gcp.storage_manager import StorageManager
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +20,7 @@ class DeploymentMixin:
                 temp_path = temp_file.name
 
             try:
-                storage_manager = StorageManager()
-                yaml_content = storage_manager.download_yaml(self.model_name)
+                yaml_content = self.cloud_manager.storage.download_yaml(self.model_name)
                 resource_dict = yaml.safe_load(yaml_content)
 
                 with open(temp_path, "w") as f:

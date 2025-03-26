@@ -149,3 +149,6 @@ dmypy.json
 cython_debug/
 
 credentials.json
+
+dir_strut.ps1
+directory_structure.txt
