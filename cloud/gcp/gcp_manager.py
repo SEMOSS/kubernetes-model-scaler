@@ -37,11 +37,17 @@ class GCPManager(CloudManager):
         # Gotta do this since I'm not allowed to bind the service account...
         elif all(var in os.environ for var in self.required_vars):
             logger.info("Using environment variables for GCP authentication")
+
+            private_key = os.environ.get("GCP_PRIVATE_KEY")
+
+            if not private_key.startswith("-----BEGIN PRIVATE KEY-----"):
+                private_key = private_key.replace("\\n", "\n")
+
             service_account_info = {
                 "type": "service_account",
                 "project_id": os.environ.get("GCP_PROJECT_ID"),
                 "private_key_id": os.environ.get("GCP_PRIVATE_KEY_ID"),
-                "private_key": os.environ.get("GCP_PRIVATE_KEY"),
+                "private_key": private_key,
                 "client_email": os.environ.get("GCP_CLIENT_EMAIL"),
                 "client_id": os.environ.get("GCP_CLIENT_ID"),
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -49,7 +55,14 @@ class GCPManager(CloudManager):
                 "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
                 "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{os.environ.get('GCP_CLIENT_EMAIL').replace('@', '%40')}",
             }
-            return Credentials.from_service_account_info(service_account_info)
+
+            try:
+                return Credentials.from_service_account_info(service_account_info)
+            except Exception as e:
+                logger.error(
+                    f"Failed to create credentials from environment variables: {e}"
+                )
+                return None
         else:
             logger.info("Using workload identity for GCP operations")
             return None
