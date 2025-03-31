@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 class GCPManager(CloudManager):
 
     def __init__(self):
+        self.required_vars = ["GCP_PROJECT_ID", "GCP_PRIVATE_KEY", "GCP_CLIENT_EMAIL"]
         self.is_dev = IS_DEV
         self.creds = self.get_credentials()
         self.storage = StorageManager()
-        self.required_vars = ["GCP_PROJECT_ID", "GCP_PRIVATE_KEY", "GCP_CLIENT_EMAIL"]
 
     def get_credentials(self) -> Credentials | None:
         """
