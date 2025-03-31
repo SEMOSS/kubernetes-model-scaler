@@ -15,6 +15,7 @@ class GCPManager(CloudManager):
         self.is_dev = IS_DEV
         self.creds = self.get_credentials()
         self.storage = StorageManager()
+        self.required_vars = ["GCP_PROJECT_ID", "GCP_PRIVATE_KEY", "GCP_CLIENT_EMAIL"]
 
     def get_credentials(self) -> Credentials | None:
         """
@@ -33,11 +34,22 @@ class GCPManager(CloudManager):
                     "No service account credentials found for local development"
                 )
                 return None
-        elif "GOOGLE_APPLICATION_CREDENTIALS" in os.environ:
-            logger.info(
-                "Using GOOGLE_APPLICATION_CREDENTIALS environment variable for authentication"
-            )
-            return None
+        # Gotta do this since I'm not allowed to bind the service account...
+        elif all(var in os.environ for var in self.required_vars):
+            logger.info("Using environment variables for GCP authentication")
+            service_account_info = {
+                "type": "service_account",
+                "project_id": os.environ.get("GCP_PROJECT_ID"),
+                "private_key_id": os.environ.get("GCP_PRIVATE_KEY_ID"),
+                "private_key": os.environ.get("GCP_PRIVATE_KEY"),
+                "client_email": os.environ.get("GCP_CLIENT_EMAIL"),
+                "client_id": os.environ.get("GCP_CLIENT_ID"),
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{os.environ.get('GCP_CLIENT_EMAIL').replace('@', '%40')}",
+            }
+            return Credentials.from_service_account_info(service_account_info)
         else:
             logger.info("Using workload identity for GCP operations")
             return None
