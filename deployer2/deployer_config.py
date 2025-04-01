@@ -135,6 +135,7 @@ class DeployerConfig:
                         config.load_kube_config(
                             config_file=self.kubeconfig_path, context=cluster_context
                         )
+                        os.environ["KUBECONFIG"] = self.kubeconfig_path
                     else:
                         # Using default context from the kubeconfig
                         logger.info("Using default context from mounted kubeconfig")
