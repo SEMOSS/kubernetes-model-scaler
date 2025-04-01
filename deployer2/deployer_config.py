@@ -153,12 +153,6 @@ class DeployerConfig:
                     logger.error(f"Error loading mounted kubeconfig: {e}")
                     logger.info("Falling back to in-cluster config")
                     self._load_incluster_config()
-            try:
-                config.load_incluster_config()
-                logger.info("Successfully loaded in-cluster config")
-            except Exception as e:
-                logger.error(f"Failed to load in-cluster config: {e}")
-                raise
 
     def _load_incluster_config(self):
         """Helper method to load in-cluster config with proper error handling"""
