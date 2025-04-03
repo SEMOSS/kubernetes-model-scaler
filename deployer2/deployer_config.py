@@ -146,15 +146,33 @@ class DeployerConfig:
     def get_api_client(self, context_name=None):
         """
         Get API client for the specified context or current context
-        Args:
-            context_name (str, optional): The context to get client for. Defaults to current context.
-        Returns:
-            kubernetes.client.ApiClient: The API client for the context
         """
-        # Use provided context or current context
         ctx = context_name or self.current_context
 
-        if ctx in self.clients:
+        # If accessing autopilot cluster, use token-based auth
+        if ctx == self.autopilot_cluster and not IS_DEV:
+            # Get the API server URL from environment or config
+            autopilot_api_server = os.environ.get("AUTOPILOT_API_SERVER", None)
+            autopilot_token = os.environ.get("AUTOPILOT_TOKEN", "")
+
+            if not autopilot_token:
+                logger.error("No token provided for autopilot cluster authentication")
+                raise ValueError("Missing AUTOPILOT_TOKEN environment variable")
+
+            # Configure API client with token auth to autopilot cluster
+            configuration = client.Configuration()
+            configuration.host = autopilot_api_server
+            configuration.verify_ssl = False  # For testing only, enable in production
+            configuration.api_key = {"authorization": f"Bearer {autopilot_token}"}
+            configuration.api_key_prefix = {"authorization": "Bearer"}
+
+            logger.info(
+                f"Created API client for autopilot cluster using token authentication"
+            )
+            return client.ApiClient(configuration)
+
+        # Otherwise use the existing approach for standard cluster
+        elif ctx in self.clients:
             return client.ApiClient(self.clients[ctx])
         else:
             logger.error(f"No client configuration found for context: {ctx}")
