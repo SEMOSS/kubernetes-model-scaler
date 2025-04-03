@@ -43,7 +43,8 @@ class DeploymentMixin:
 
             logger.info(f"Deploying {api_version}/{kind} for model {self.model_name}")
 
-            custom_api = client.CustomObjectsApi()
+            standard_api_client = self.get_api_client(self.standard_cluster)
+            custom_api = client.CustomObjectsApi(standard_api_client)
 
             if "/" in api_version:
                 group, version = api_version.split("/")
@@ -69,7 +70,6 @@ class DeploymentMixin:
                     plural=self._get_plural_name(kind).lower(),
                     name=name,
                     body=resource_dict,
-                    _content_type="application/strategic-merge-patch+json",
                 )
                 logger.info(f"Patched {kind}/{name} successfully")
             except ApiException as e:
@@ -122,7 +122,8 @@ class DeploymentMixin:
                 f"Removing InferenceService {model_name} from namespace {namespace}"
             )
 
-            custom_api = client.CustomObjectsApi()
+            standard_api_client = self.get_api_client(self.standard_cluster)
+            custom_api = client.CustomObjectsApi(standard_api_client)
 
             api_version = "serving.kserve.io/v1beta1"
             kind = "InferenceService"

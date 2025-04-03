@@ -16,17 +16,15 @@ class IngressMixin:
     ):
         """
         Create an Ingress resource in the autopilot cluster that points to the ExternalName service.
-
         Args:
             host (str): The hostname for the ingress rule
             tls_secret_name (str): The name of the TLS secret
-
         Returns:
             bool: True if successful, False otherwise
         """
         try:
             # Switch to autopilot cluster where the Ingress should be deployed
-            self.switch_cluster(self.autopilot_cluster)
+            api_client = self.get_api_client(self.autopilot_cluster)
 
             namespace = self.namespace
             model_name = self.model_name
@@ -36,7 +34,7 @@ class IngressMixin:
 
             logger.info(f"Creating Ingress {ingress_name} in namespace {namespace}")
 
-            networking_v1_api = client.NetworkingV1Api()
+            networking_v1_api = client.NetworkingV1Api(api_client)
 
             path = client.V1HTTPIngressPath(
                 path=f"{path_prefix}/(.*)",
@@ -107,14 +105,14 @@ class IngressMixin:
         """
         try:
             # Switch to autopilot cluster where the Ingress is deployed
-            self.switch_cluster(self.autopilot_cluster)
+            api_client = self.get_api_client(self.autopilot_cluster)
 
             namespace = self.namespace
             ingress_name = f"{self.model_name}-ingress"
 
             logger.info(f"Removing Ingress {ingress_name} from namespace {namespace}")
 
-            networking_v1_api = client.NetworkingV1Api()
+            networking_v1_api = client.NetworkingV1Api(api_client)
 
             try:
                 # Checking if the ingress exists before attempting to delete
