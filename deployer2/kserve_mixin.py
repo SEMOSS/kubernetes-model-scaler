@@ -21,6 +21,8 @@ class KServeMixin:
         namespace = self.model_namespace
         kserve = KServeClient()
 
+        logger.info(f"Checking model {model_name} in namespace {namespace}")
+
         timeout = 1200  # 20 minutes
         polling_interval = 10
         start_time = time.time()

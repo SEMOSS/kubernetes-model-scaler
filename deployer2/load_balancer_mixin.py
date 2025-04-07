@@ -13,19 +13,14 @@ class LoadBalancerMixin:
         Create a LoadBalancer service for the deployed model.
         """
         try:
-            # Get API client for standard cluster
-            standard_api_client = self.get_api_client(self.standard_cluster)
-
-            # Create CoreV1Api for standard cluster operations
-            core_v1_api = client.CoreV1Api(standard_api_client)
-
             namespace = self.model_namespace
             model_name = self.model_name
             service_name = f"{model_name}-lb"
 
             logger.info(
-                f"Creating LoadBalancer service {service_name} for model {model_name} in standard cluster"
+                f"Creating LoadBalancer service {service_name} for model {model_name}"
             )
+            core_v1_api = client.CoreV1Api()
 
             service = client.V1Service(
                 api_version="v1",
@@ -43,9 +38,7 @@ class LoadBalancerMixin:
                     name=service_name, namespace=namespace
                 )
 
-                logger.info(
-                    f"Service {service_name} already exists in standard cluster, replacing it"
-                )
+                logger.info(f"Service {service_name} already exists, replacing it")
                 core_v1_api.replace_namespaced_service(
                     name=service_name, namespace=namespace, body=service
                 )
@@ -53,9 +46,7 @@ class LoadBalancerMixin:
 
             except ApiException as e:
                 if e.status == 404:
-                    logger.info(
-                        f"Service {service_name} doesn't exist in standard cluster, creating it"
-                    )
+                    logger.info(f"Service {service_name} doesn't exist, creating it")
                     core_v1_api.create_namespaced_service(
                         namespace=namespace, body=service
                     )
@@ -73,26 +64,25 @@ class LoadBalancerMixin:
             logger.error(f"Unexpected error when creating LoadBalancer: {e}")
             raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
-    def get_load_balancer_ip(self, core_v1_api=None, wait=False, timeout=300):
+    def get_load_balancer_ip(self, wait=False, timeout=300):
         """
         Get the external IP address of the LoadBalancer service.
+
         Args:
-            core_v1_api: Optional CoreV1Api client. If None, one will be created.
             wait (bool): Whether to wait for the IP to be assigned
             timeout (int): Timeout in seconds if waiting
+
         Returns:
             str: External IP address or None if not available
         """
         try:
-            # If no API client is provided, create one for standard cluster
-            if core_v1_api is None:
-                standard_api_client = self.get_api_client(self.standard_cluster)
-                core_v1_api = client.CoreV1Api(standard_api_client)
-
-            namespace = self.model_namespace
+            namespace = "huggingface-models"
             service_name = f"{self.model_name}-lb"
 
+            core_v1_api = client.CoreV1Api()
+
             if not wait:
+                # Just check once
                 service = core_v1_api.read_namespaced_service(
                     name=service_name, namespace=namespace
                 )
@@ -158,19 +148,14 @@ class LoadBalancerMixin:
             bool: True if successful, False otherwise
         """
         try:
-            # Get API client for standard cluster
-            standard_api_client = self.get_api_client(self.standard_cluster)
-
-            # Create CoreV1Api for standard cluster operations
-            core_v1_api = client.CoreV1Api(standard_api_client)
-
             namespace = self.model_namespace
             model_name = self.model_name
             service_name = f"{model_name}-lb"
 
             logger.info(
-                f"Removing LoadBalancer service {service_name} for model {model_name} from standard cluster"
+                f"Removing LoadBalancer service {service_name} for model {model_name}"
             )
+            core_v1_api = client.CoreV1Api()
 
             try:
                 # Check if the service exists before attempting to delete
@@ -183,16 +168,14 @@ class LoadBalancerMixin:
                     name=service_name, namespace=namespace
                 )
 
-                logger.info(
-                    f"Successfully removed LoadBalancer service {service_name} from standard cluster"
-                )
+                logger.info(f"Successfully removed LoadBalancer service {service_name}")
                 return True
 
             except ApiException as e:
                 if e.status == 404:
                     # Service doesn't exist which is fine for removal
                     logger.info(
-                        f"LoadBalancer {service_name} not found in standard cluster, nothing to remove"
+                        f"LoadBalancer {service_name} not found, nothing to remove"
                     )
                     return True
                 else:

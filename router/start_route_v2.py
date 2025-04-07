@@ -50,19 +50,19 @@ def cleanup_deployment(deployer, completed_steps):
         except Exception as e:
             logger.error(f"Failed to unregister active model: {str(e)}")
 
-    if completed_steps["ingress_created"]:
-        logger.info("Removing ingress")
-        try:
-            deployer.remove_ingress()
-        except Exception as e:
-            logger.error(f"Failed to remove ingress: {str(e)}")
+    # if completed_steps["ingress_created"]:
+    #     logger.info("Removing ingress")
+    #     try:
+    #         deployer.remove_ingress()
+    #     except Exception as e:
+    #         logger.error(f"Failed to remove ingress: {str(e)}")
 
-    if completed_steps["external_name_created"]:
-        logger.info("Removing external name service")
-        try:
-            deployer.remove_external_name_service()
-        except Exception as e:
-            logger.error(f"Failed to remove external name service: {str(e)}")
+    # if completed_steps["external_name_created"]:
+    #     logger.info("Removing external name service")
+    #     try:
+    #         deployer.remove_external_name_service()
+    #     except Exception as e:
+    #         logger.error(f"Failed to remove external name service: {str(e)}")
 
     if completed_steps["load_balancer_created"]:
         logger.info("Removing load balancer")
@@ -118,12 +118,12 @@ async def start_model(request: ModelRequest):
         deployment_steps["load_balancer_created"] = True
 
         # Create the ExternalName service
-        deployer.create_external_name_service()
-        deployment_steps["external_name_created"] = True
+        # deployer.create_external_name_service()
+        # deployment_steps["external_name_created"] = True
 
-        # Create the Ingress
-        deployer.create_ingress()
-        deployment_steps["ingress_created"] = True
+        # # Create the Ingress
+        # deployer.create_ingress()
+        # deployment_steps["ingress_created"] = True
 
         # Wait for the inference service to be ready
         model_ready = deployer.wait_for_model_ready()

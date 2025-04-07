@@ -24,11 +24,11 @@ async def stop_model(model_id: str = None, model: str = None):
         # Removing Load Balancer from the standard cluster
         deployer.remove_load_balancer()
 
-        # Removing the ExternalName service from autopilot cluster
-        deployer.remove_external_name_service()
+        # # Removing the ExternalName service from autopilot cluster
+        # deployer.remove_external_name_service()
 
-        # Removing the Ingress from the autopilot cluster
-        deployer.remove_ingress()
+        # # Removing the Ingress from the autopilot cluster
+        # deployer.remove_ingress()
 
         # I think I can attempt to remove both here regardless if they exist??
         # Unregister the model from Zookeeper warming path
