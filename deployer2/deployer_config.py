@@ -108,40 +108,66 @@ class DeployerConfig:
                 logger.error(f"Error loading kubeconfig: {e}")
                 raise RuntimeError(f"Failed to initialize Kubernetes clients: {e}")
         else:
-            # Production mode with mounted kubeconfig
-            if self.kubeconfig_path and os.path.exists(self.kubeconfig_path):
-                logger.info(f"Using mounted kubeconfig at {self.kubeconfig_path}")
-                try:
-                    contexts, _ = config.list_kube_config_contexts(
-                        config_file=self.kubeconfig_path
-                    )
-                    available_contexts = [ctx["name"] for ctx in contexts]
+            try:
+                # For standard cluster, always use in-cluster config
+                standard_config = client.Configuration()
+                config.load_incluster_config(client_configuration=standard_config)
+                self.clients[self.standard_cluster] = standard_config
+                logger.info(f"Using in-cluster config for standard cluster")
 
-                    for context_name in [self.standard_cluster, self.autopilot_cluster]:
-                        if context_name in available_contexts:
-                            # Create client configuration for this context
-                            client_config = client.Configuration()
-                            config.load_kube_config(
-                                client_configuration=client_config,
-                                config_file=self.kubeconfig_path,
-                                context=context_name,
-                            )
-                            # Store the client configuration
-                            self.clients[context_name] = client_config
-                            logger.info(
-                                f"Successfully created client for context: {context_name}"
-                            )
-                        else:
-                            logger.warning(
-                                f"Context {context_name} not found in mounted kubeconfig"
-                            )
-                except Exception as e:
-                    logger.error(f"Error loading mounted kubeconfig: {e}")
-                    logger.info("Falling back to in-cluster config")
-                    self._load_incluster_config()
-            else:
-                # No mounted kubeconfig, use in-cluster config
-                self._load_incluster_config()
+                # For autopilot cluster, use token-based auth if available
+                autopilot_api_server = os.environ.get("AUTOPILOT_API_SERVER")
+                autopilot_token = os.environ.get("AUTOPILOT_TOKEN")
+
+                if autopilot_api_server and autopilot_token:
+                    # Configure API client with token auth for autopilot cluster
+                    autopilot_config = client.Configuration()
+                    autopilot_config.host = autopilot_api_server
+                    autopilot_config.verify_ssl = (
+                        False  # Consider enabling in production
+                    )
+                    autopilot_config.api_key = {
+                        "authorization": f"Bearer {autopilot_token}"
+                    }
+                    autopilot_config.api_key_prefix = {"authorization": "Bearer"}
+
+                    self.clients[self.autopilot_cluster] = autopilot_config
+                    logger.info(
+                        f"Using token auth for autopilot cluster with server {autopilot_api_server}"
+                    )
+                elif self.kubeconfig_path and os.path.exists(self.kubeconfig_path):
+                    # Fall back to kubeconfig for autopilot if token not available
+                    logger.info(
+                        f"No token for autopilot cluster, falling back to kubeconfig for autopilot"
+                    )
+                    try:
+                        autopilot_config = client.Configuration()
+                        config.load_kube_config(
+                            client_configuration=autopilot_config,
+                            config_file=self.kubeconfig_path,
+                            context=self.autopilot_cluster,
+                        )
+                        self.clients[self.autopilot_cluster] = autopilot_config
+                        logger.info(
+                            f"Successfully created client for autopilot using kubeconfig"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Error loading autopilot context from kubeconfig: {e}"
+                        )
+                        logger.warning(
+                            f"No valid authentication method for autopilot cluster"
+                        )
+                else:
+                    logger.warning(
+                        f"No valid authentication method for autopilot cluster"
+                    )
+
+            except Exception as e:
+                logger.error(
+                    f"Error initializing Kubernetes clients: {e}", exc_info=True
+                )
+                raise RuntimeError(f"Failed to initialize Kubernetes clients: {e}")
 
     def get_api_client(self, context_name=None):
         """
@@ -171,7 +197,6 @@ class DeployerConfig:
             )
             return client.ApiClient(configuration)
 
-        # Otherwise use the existing approach for standard cluster
         elif ctx in self.clients:
             return client.ApiClient(self.clients[ctx])
         else:
@@ -181,8 +206,10 @@ class DeployerConfig:
     def _load_incluster_config(self):
         """Helper method to load in-cluster config with proper error handling"""
         try:
-            config.load_incluster_config()
-            logger.info("Successfully loaded in-cluster config")
+            standard_config = client.Configuration()
+            config.load_incluster_config(client_configuration=standard_config)
+            self.clients[self.standard_cluster] = standard_config
+            logger.info("Successfully loaded in-cluster config for standard cluster")
         except Exception as e:
             logger.error(f"Error loading in-cluster config: {e}")
             raise RuntimeError(
