@@ -87,3 +87,45 @@ class StorageManager:
             raise HTTPException(
                 status_code=500, detail=f"Failed to download YAML from GCS: {str(e)}"
             )
+
+    def get_node_pool_config(self, config_name="node_pools.json"):
+        """
+        Download and parse node pool configuration from GCS.
+        Args:
+            config_name (str): Name of the config file (default: node_pools_config.json)
+        Returns:
+            dict: Parsed node pool configuration
+        """
+        import json
+
+        try:
+            blob = self.bucket.blob(config_name)
+
+            if not blob.exists():
+                logger.error(
+                    f"Config file {config_name} not found in bucket {self.bucket_name}"
+                )
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Config file {config_name} not found in bucket {self.bucket_name}",
+                )
+
+            content = blob.download_as_string().decode("utf-8")
+            config = json.loads(content)
+            logger.info(f"Downloaded and parsed {config_name} from GCS")
+            return config
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing JSON config from GCS: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to parse node pool config JSON: {str(e)}",
+            )
+        except Exception as e:
+            if isinstance(e, HTTPException):
+                raise e
+            logger.error(f"Error downloading config from GCS: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to download node pool config from GCS: {str(e)}",
+            )

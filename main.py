@@ -17,6 +17,7 @@ from router.destroy_daemon_set_route import destroy_daemon_set_router
 from router.start_route_v2 import start_router_v2
 from router.stop_route_v2 import stop_router_v2
 from router.model_metadata_route import metadata_router
+from router.compute.pools_info import pools_info_router
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ app.include_router(zk_info_router, prefix="/api")
 app.include_router(deploy_daemon_set_router, prefix="/api/daemon-set")
 app.include_router(destroy_daemon_set_router, prefix="/api/daemon-set")
 app.include_router(metadata_router, prefix="/api")
+app.include_router(pools_info_router, prefix="/api/resources")
 
 
 if __name__ == "__main__":
