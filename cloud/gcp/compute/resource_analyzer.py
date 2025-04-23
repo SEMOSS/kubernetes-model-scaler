@@ -1,4 +1,5 @@
 from kubernetes import client, config
+from kubernetes.client.rest import ApiException
 import yaml
 import logging
 from typing import Dict, List, Tuple
@@ -597,3 +598,224 @@ class ResourceAnalyzer:
             except ValueError:
                 logger.error(f"Could not parse memory string: {memory_str}")
                 return 0
+
+    def get_models_by_node_pool(self) -> Dict[str, List[Dict]]:
+        """
+        Get information about which models are running on which node pools and their resource consumption.
+
+        Returns:
+            Dictionary with node pool names as keys and lists of model information as values
+        """
+        try:
+            # Get nodes grouped by pool
+            nodes_by_pool = self.get_nodes_by_pool()
+
+            # Initialize result dictionary
+            models_by_pool = {pool: [] for pool in self.node_pools}
+
+            # Focus on huggingface-models namespace
+            namespace = "huggingface-models"
+
+            # Debug collections
+            all_pods = []
+            all_deployments = []
+
+            try:
+                # Get all deployments in the namespace
+                deployments = self.apps_v1.list_namespaced_deployment(
+                    namespace=namespace
+                ).items
+
+                # Log all deployments for debugging
+                for deployment in deployments:
+                    all_deployments.append(deployment.metadata.name)
+
+                logger.info(
+                    f"Found {len(deployments)} deployments in {namespace}: {all_deployments}"
+                )
+
+                # Get all pods in the namespace
+                pods = self.core_v1.list_namespaced_pod(namespace=namespace).items
+
+                # Log all pods for debugging
+                for pod in pods:
+                    all_pods.append(pod.metadata.name)
+
+                # Process deployments first to identify all models
+                all_models = set()
+                deployment_to_model = {}
+
+                for deployment in deployments:
+                    model_name = None
+
+                    # Try to extract model name from labels
+                    if (
+                        deployment.metadata.labels
+                        and "serving.kserve.io/inferenceservice"
+                        in deployment.metadata.labels
+                    ):
+                        model_name = deployment.metadata.labels[
+                            "serving.kserve.io/inferenceservice"
+                        ]
+                    # Alternative: try from deployment name pattern
+                    elif "-predictor-" in deployment.metadata.name:
+                        model_name = deployment.metadata.name.split("-predictor-")[0]
+
+                    if model_name:
+                        all_models.add(model_name)
+                        deployment_to_model[deployment.metadata.name] = model_name
+
+                logger.info(f"Identified models from deployments: {all_models}")
+                logger.info(f"Deployment to model mapping: {deployment_to_model}")
+
+                # Now process pods to assign models to node pools
+                for pod in pods:
+                    # Skip if pod is not scheduled on a node
+                    if not pod.spec.node_name:
+                        continue
+
+                    # Extract model name using multiple approaches
+                    model_name = None
+
+                    # 1. Try from pod labels (most reliable)
+                    if (
+                        pod.metadata.labels
+                        and "serving.kserve.io/inferenceservice" in pod.metadata.labels
+                    ):
+                        model_name = pod.metadata.labels[
+                            "serving.kserve.io/inferenceservice"
+                        ]
+
+                    # 2. If not found in labels, try to determine from owner references
+                    if not model_name and pod.metadata.owner_references:
+                        for owner in pod.metadata.owner_references:
+                            if owner.kind == "ReplicaSet":
+                                # Extract prefix from ReplicaSet name (remove last hash)
+                                rs_prefix = (
+                                    owner.name.rsplit("-", 1)[0]
+                                    if "-" in owner.name
+                                    else owner.name
+                                )
+
+                                # Try to find matching deployment
+                                for (
+                                    deployment_name,
+                                    mapped_model,
+                                ) in deployment_to_model.items():
+                                    if rs_prefix.startswith(
+                                        deployment_name
+                                    ) or deployment_name.startswith(rs_prefix):
+                                        model_name = mapped_model
+                                        break
+
+                    # 3. Try direct extraction from pod name as last resort
+                    if not model_name:
+                        if "-predictor-" in pod.metadata.name:
+                            model_name = pod.metadata.name.split("-predictor-")[0]
+
+                    # Skip if we couldn't determine the model name
+                    if not model_name:
+                        continue
+
+                    # Find which pool this node belongs to
+                    pod_node = pod.spec.node_name
+                    pool_name = None
+                    for pool, nodes in nodes_by_pool.items():
+                        if pod_node in nodes:
+                            pool_name = pool
+                            break
+
+                    if not pool_name:
+                        continue
+
+                    # Calculate resource usage for this pod
+                    cpu_requests = 0
+                    memory_requests = 0
+                    gpu_requests = 0
+
+                    for container in pod.spec.containers:
+                        # Skip queue-proxy container which is part of Knative
+                        if container.name == "queue-proxy":
+                            continue
+
+                        if container.resources and container.resources.requests:
+                            requests = container.resources.requests
+                            if "cpu" in requests:
+                                cpu_requests += self._parse_cpu(requests["cpu"])
+                            if "memory" in requests:
+                                memory_requests += self._parse_memory(
+                                    requests["memory"]
+                                )
+
+                            # Check for GPU requests
+                            for resource_name, value in requests.items():
+                                if resource_name.endswith("/gpu"):
+                                    gpu_requests += int(value)
+
+                    # Determine status based on pod status
+                    service_status = "Unknown"
+                    if pod.status:
+                        if pod.status.phase == "Running":
+                            service_status = "True"
+                        elif pod.status.phase == "Pending":
+                            service_status = "False"
+                        else:
+                            service_status = pod.status.phase
+
+                    # Try to find service URL (KServe convention)
+                    service_url = (
+                        f"http://{model_name}-predictor.{namespace}.svc.cluster.local"
+                    )
+
+                    # Add model to the appropriate pool
+                    model_info = {
+                        "name": model_name,
+                        "namespace": namespace,
+                        "node": pod_node,
+                        "status": service_status,
+                        "url": service_url,
+                        "pod": pod.metadata.name,  # Add pod name for debugging
+                        "resources": {
+                            "cpu_requests": round(cpu_requests, 2),
+                            "memory_requests_gi": round(memory_requests / (1024**3), 2),
+                            "gpu_requests": gpu_requests,
+                        },
+                    }
+
+                    # Avoid duplicates (multiple pods for same model)
+                    existing_model = next(
+                        (
+                            m
+                            for m in models_by_pool[pool_name]
+                            if m["name"] == model_name
+                        ),
+                        None,
+                    )
+                    if existing_model:
+                        # Update resources if this is another pod for the same model
+                        existing_model["resources"]["cpu_requests"] += model_info[
+                            "resources"
+                        ]["cpu_requests"]
+                        existing_model["resources"]["memory_requests_gi"] += model_info[
+                            "resources"
+                        ]["memory_requests_gi"]
+                        existing_model["resources"]["gpu_requests"] += model_info[
+                            "resources"
+                        ]["gpu_requests"]
+                    else:
+                        models_by_pool[pool_name].append(model_info)
+
+                # Log summary for debugging
+                for pool_name, models in models_by_pool.items():
+                    logger.info(
+                        f"Pool {pool_name}: {len(models)} models - {[m['name'] for m in models]}"
+                    )
+
+            except ApiException as e:
+                logger.warning(f"Error getting resources in namespace {namespace}: {e}")
+
+            return models_by_pool
+
+        except Exception as e:
+            logger.error(f"Error getting models by node pool: {e}", exc_info=True)
+            return {}
