@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List, Dict
 import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -6,6 +6,17 @@ from kubernetes.client.rest import ApiException
 from cloud.gcp.compute.resource_analyzer import ResourceAnalyzer
 
 logger = logging.getLogger(__name__)
+
+
+class ModelResourceInfo(BaseModel):
+    """Model for representing model resource usage"""
+
+    name: str
+    namespace: str
+    node: str
+    status: str
+    url: Optional[str] = None
+    resources: Dict[str, float]
 
 
 class NodePoolResponse(BaseModel):
@@ -20,6 +31,7 @@ class NodePoolResponse(BaseModel):
     cpu_available: float
     memory_available_gi: float
     gpu_available: int
+    models: List[ModelResourceInfo] = []
 
 
 pools_info_router = APIRouter()
@@ -28,7 +40,8 @@ pools_info_router = APIRouter()
 @pools_info_router.get("/node-pools-info")
 async def get_pools_info():
     """
-    Fetch and return information about available node pools in the cluster.
+    Fetch and return information about available node pools in the cluster,
+    including models running on each pool and their resource consumption.
 
     Returns:
         dict: Dictionary containing node pool information and resource availability
@@ -37,6 +50,7 @@ async def get_pools_info():
         resource_analyzer = ResourceAnalyzer()
 
         pool_resources = resource_analyzer.get_all_pool_resources()
+        models_by_pool = resource_analyzer.get_models_by_node_pool()
 
         formatted_pools = []
         for pool_name, pool_data in pool_resources.items():
@@ -61,6 +75,9 @@ async def get_pools_info():
                     pool_data["total"]["memory_requests_available_gi"], 2
                 )
 
+                # Get models running on this pool
+                pool_models = models_by_pool.get(pool_name, [])
+
                 formatted_pools.append(
                     NodePoolResponse(
                         name=pool_name,
@@ -72,6 +89,10 @@ async def get_pools_info():
                         cpu_available=cpu_available,
                         memory_available_gi=memory_available_gi,
                         gpu_available=pool_data["total"]["gpu_requests_available"],
+                        models=[
+                            ModelResourceInfo(**model_info)
+                            for model_info in pool_models
+                        ],
                     )
                 )
 
