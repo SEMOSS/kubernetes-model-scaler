@@ -23,6 +23,47 @@ class DeploymentMixin:
                 yaml_content = self.cloud_manager.storage.download_yaml(self.model_name)
                 resource_dict = yaml.safe_load(yaml_content)
 
+                # Adding model-id label to the metadata
+                if resource_dict.get("kind") == "InferenceService":
+                    # Add label to the InferenceService metadata
+                    if "metadata" not in resource_dict:
+                        resource_dict["metadata"] = {}
+                    if "labels" not in resource_dict["metadata"]:
+                        resource_dict["metadata"]["labels"] = {}
+
+                    # Add model_id label to the InferenceService
+                    resource_dict["metadata"]["labels"]["model-id"] = str(self.model_id)
+
+                    # Additionally, we need to add podTemplateSpec annotations/labels
+                    # This ensures the pods created by KServe will inherit the label
+                    if "spec" in resource_dict and "predictor" in resource_dict["spec"]:
+                        if "template" not in resource_dict["spec"]["predictor"]:
+                            resource_dict["spec"]["predictor"]["template"] = {}
+                        if (
+                            "metadata"
+                            not in resource_dict["spec"]["predictor"]["template"]
+                        ):
+                            resource_dict["spec"]["predictor"]["template"][
+                                "metadata"
+                            ] = {}
+                        if (
+                            "labels"
+                            not in resource_dict["spec"]["predictor"]["template"][
+                                "metadata"
+                            ]
+                        ):
+                            resource_dict["spec"]["predictor"]["template"]["metadata"][
+                                "labels"
+                            ] = {}
+
+                        # Add model_id label to the pod template
+                        resource_dict["spec"]["predictor"]["template"]["metadata"][
+                            "labels"
+                        ]["model-id"] = str(self.model_id)
+
+                # Update the yaml_content with the modified dictionary
+                yaml_content = yaml.dump(resource_dict)
+
                 with open(temp_path, "w") as f:
                     f.write(yaml_content)
 

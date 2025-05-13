@@ -161,15 +161,23 @@ class ResourceAnalyzer:
                         if resource_name.endswith("/gpu"):
                             used_resources["gpu_limits"] += int(limits[resource_name])
 
+        # Round CPU values to 2 decimal places
+        used_resources["cpu_requests"] = round(used_resources["cpu_requests"], 2)
+        used_resources["cpu_limits"] = round(used_resources["cpu_limits"], 2)
+
+        cpu_allocatable = round(self._parse_cpu(allocatable["cpu"]), 2)
+
         available = {
-            "cpu_allocatable": self._parse_cpu(allocatable["cpu"]),
+            "cpu_allocatable": cpu_allocatable,
             "memory_allocatable_bytes": self._parse_memory(allocatable["memory"]),
-            "cpu_available_requests": self._parse_cpu(allocatable["cpu"])
-            - used_resources["cpu_requests"],
+            "cpu_available_requests": round(
+                cpu_allocatable - used_resources["cpu_requests"], 2
+            ),
             "memory_available_requests_bytes": self._parse_memory(allocatable["memory"])
             - used_resources["memory_requests_bytes"],
-            "cpu_available_limits": self._parse_cpu(allocatable["cpu"])
-            - used_resources["cpu_limits"],
+            "cpu_available_limits": round(
+                cpu_allocatable - used_resources["cpu_limits"], 2
+            ),
             "memory_available_limits_bytes": self._parse_memory(allocatable["memory"])
             - used_resources["memory_limits_bytes"],
         }
@@ -538,18 +546,18 @@ class ResourceAnalyzer:
             cpu_str: CPU resource string (e.g., '100m', '0.1', '1')
 
         Returns:
-            CPU value as a float
+            CPU value as a float, rounded to 2 decimal places
         """
         if not cpu_str:
-            return 0
+            return 0.0
 
         if isinstance(cpu_str, (int, float)):
-            return float(cpu_str)
+            return round(float(cpu_str), 2)
 
         if cpu_str.endswith("m"):
-            return float(cpu_str[:-1]) / 1000
+            return round(float(cpu_str[:-1]) / 1000, 2)
         else:
-            return float(cpu_str)
+            return round(float(cpu_str), 2)
 
     def _parse_memory(self, memory_str: str) -> int:
         """
@@ -626,7 +634,7 @@ class ResourceAnalyzer:
                     namespace=namespace
                 ).items
 
-                # Log all deployments for debugging
+                # debugging
                 for deployment in deployments:
                     all_deployments.append(deployment.metadata.name)
 
@@ -637,7 +645,7 @@ class ResourceAnalyzer:
                 # Get all pods in the namespace
                 pods = self.core_v1.list_namespaced_pod(namespace=namespace).items
 
-                # Log all pods for debugging
+                # debugging
                 for pod in pods:
                     all_pods.append(pod.metadata.name)
 
@@ -668,7 +676,7 @@ class ResourceAnalyzer:
                 logger.info(f"Identified models from deployments: {all_models}")
                 logger.info(f"Deployment to model mapping: {deployment_to_model}")
 
-                # Now process pods to assign models to node pools
+                # process pods to assign models to node pools
                 for pod in pods:
                     # Skip if pod is not scheduled on a node
                     if not pod.spec.node_name:
@@ -756,9 +764,9 @@ class ResourceAnalyzer:
                     service_status = "Unknown"
                     if pod.status:
                         if pod.status.phase == "Running":
-                            service_status = "True"
+                            service_status = "Running"
                         elif pod.status.phase == "Pending":
-                            service_status = "False"
+                            service_status = "Pending"
                         else:
                             service_status = pod.status.phase
 
@@ -767,6 +775,10 @@ class ResourceAnalyzer:
                         f"http://{model_name}-predictor.{namespace}.svc.cluster.local"
                     )
 
+                    model_id = "N/A"
+                    if pod.metadata.labels and "model-id" in pod.metadata.labels:
+                        model_id = pod.metadata.labels["model-id"]
+
                     # Add model to the appropriate pool
                     model_info = {
                         "name": model_name,
@@ -774,7 +786,8 @@ class ResourceAnalyzer:
                         "node": pod_node,
                         "status": service_status,
                         "url": service_url,
-                        "pod": pod.metadata.name,  # Add pod name for debugging
+                        "pod": pod.metadata.name,
+                        "model_id": model_id,
                         "resources": {
                             "cpu_requests": round(cpu_requests, 2),
                             "memory_requests_gi": round(memory_requests / (1024**3), 2),
@@ -793,19 +806,22 @@ class ResourceAnalyzer:
                     )
                     if existing_model:
                         # Update resources if this is another pod for the same model
-                        existing_model["resources"]["cpu_requests"] += model_info[
-                            "resources"
-                        ]["cpu_requests"]
-                        existing_model["resources"]["memory_requests_gi"] += model_info[
-                            "resources"
-                        ]["memory_requests_gi"]
+                        existing_model["resources"]["cpu_requests"] = round(
+                            existing_model["resources"]["cpu_requests"]
+                            + model_info["resources"]["cpu_requests"],
+                            2,
+                        )
+                        existing_model["resources"]["memory_requests_gi"] = round(
+                            existing_model["resources"]["memory_requests_gi"]
+                            + model_info["resources"]["memory_requests_gi"],
+                            2,
+                        )
                         existing_model["resources"]["gpu_requests"] += model_info[
                             "resources"
                         ]["gpu_requests"]
                     else:
                         models_by_pool[pool_name].append(model_info)
 
-                # Log summary for debugging
                 for pool_name, models in models_by_pool.items():
                     logger.info(
                         f"Pool {pool_name}: {len(models)} models - {[m['name'] for m in models]}"

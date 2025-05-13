@@ -12,6 +12,7 @@ class ModelResourceInfo(BaseModel):
     """Model for representing model resource usage"""
 
     name: str
+    model_id: str
     namespace: str
     node: str
     status: str
@@ -63,13 +64,13 @@ async def get_pools_info():
                 )
 
                 machine_specs = resource_analyzer.machine_specs.get(machine_type, {})
-                cpu_total = machine_specs.get("cpu", 0) * resource_analyzer.node_pools[
-                    pool_name
-                ].get("instances", 1)
-                memory_total_gi = machine_specs.get(
-                    "memory_gi", 0
-                ) * resource_analyzer.node_pools[pool_name].get("instances", 1)
+                instances = resource_analyzer.node_pools[pool_name].get("instances", 1)
 
+                # Calculate total CPU and memory based on machine specs and instances
+                cpu_total = machine_specs.get("cpu", 0) * instances
+                memory_total_gi = machine_specs.get("memory_gi", 0) * instances
+
+                # Round CPU available to 2 decimal places
                 cpu_available = round(pool_data["total"]["cpu_requests_available"], 2)
                 memory_available_gi = round(
                     pool_data["total"]["memory_requests_available_gi"], 2
@@ -78,17 +79,24 @@ async def get_pools_info():
                 # Get models running on this pool
                 pool_models = models_by_pool.get(pool_name, [])
 
+                # Calculate total GPU count for the pool (per instance * number of instances)
+                total_gpu_count = gpu_specs.get("count", 0) * instances
+
                 formatted_pools.append(
                     NodePoolResponse(
                         name=pool_name,
                         machine_type=machine_type,
                         gpu_type=gpu_specs.get("type"),
-                        gpu_count=gpu_specs.get("count", 0),
-                        cpu_total=round(cpu_total, 2),
+                        gpu_count=total_gpu_count,  # Total GPUs across all instances
+                        cpu_total=round(cpu_total, 2),  # Ensure rounding
                         memory_total_gi=round(memory_total_gi, 2),
                         cpu_available=cpu_available,
                         memory_available_gi=memory_available_gi,
-                        gpu_available=pool_data["total"]["gpu_requests_available"],
+                        # Ensure GPU available doesn't exceed total count
+                        gpu_available=min(
+                            round(pool_data["total"]["gpu_requests_available"]),
+                            total_gpu_count,
+                        ),
                         models=[
                             ModelResourceInfo(**model_info)
                             for model_info in pool_models

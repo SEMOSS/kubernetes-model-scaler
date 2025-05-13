@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 ZK_HOSTS = os.getenv("ZK_HOSTS")
+# ZK_HOSTS = "10.55.2.11:2181"
 DOCKER_IMAGE = os.getenv("DOCKER_IMAGE")
 NAMESPACE = os.getenv("NAMESPACE", "semoss")
 MODEL_NAMESPACE = os.getenv("MODEL_NAMESPACE", "huggingface-models")
