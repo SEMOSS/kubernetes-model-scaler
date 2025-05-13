@@ -18,25 +18,45 @@ async def stop_model(model_id: str = None, model: str = None):
             model_type="",
         )
 
-        # Removing the InferenceService from the standard cluster
-        deployer.remove_inference_service()
+        # Register model as cooling first and remember its original state
+        original_state = deployer.register_cooling_model()
+        logger.info(
+            f"Model {model_id} registered as cooling (original state: {original_state})"
+        )
 
-        # Removing Load Balancer from the standard cluster
-        deployer.remove_load_balancer()
+        try:
+            # Removing the InferenceService from the standard cluster
+            deployer.remove_inference_service()
 
-        # # Removing the ExternalName service from autopilot cluster
-        # deployer.remove_external_name_service()
+            # Removing Load Balancer from the standard cluster
+            deployer.remove_load_balancer()
 
-        # # Removing the Ingress from the autopilot cluster
-        # deployer.remove_ingress()
+            # # Removing the ExternalName service from autopilot cluster
+            # deployer.remove_external_name_service()
 
-        # I think I can attempt to remove both here regardless if they exist??
-        # Unregister the model from Zookeeper warming path
-        deployer.unregister_warming_model()
-        # Unregister the model from Zookeeper active path
-        deployer.unregister_active_model()
+            # # Removing the Ingress from the autopilot cluster
+            # deployer.remove_ingress()
 
-        return {"message": "Model stopped successfully"}
+            # Unregister from all states after successful removal
+            deployer.unregister_warming_model()
+            deployer.unregister_active_model()
+            deployer.unregister_cooling_model()
+
+            return {"message": "Model stopped successfully"}
+        except Exception as e:
+            # If any operation fails, restore the original state
+            logger.warning(
+                f"Model stop operation failed, attempting to restore original state: {str(e)}"
+            )
+            if deployer.restore_original_state():
+                logger.info(f"Successfully restored model {model_id} to original state")
+            else:
+                logger.error(
+                    f"Failed to restore model {model_id} to original state - manual intervention may be required"
+                )
+            # Re-raise the exception to be caught by the outer try-except
+            raise
+
     except Exception as e:
         logger.error(f"Failed to stop model: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to stop model: {str(e)}")

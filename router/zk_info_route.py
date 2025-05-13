@@ -16,10 +16,12 @@ async def zk_info():
         models = zk_manager.get_all_models()
         warming_models = models.get("warming", [])
         active_models = models.get("active", [])
+        cooling_models = models.get("cooling", [])
         deployer_status = zk_manager.get_deployer_status()
         return {
             "active_models": active_models,
             "warming_models": warming_models,
+            "cooling_models": cooling_models,
             "deployer_status": deployer_status,
         }
     except Exception as e:

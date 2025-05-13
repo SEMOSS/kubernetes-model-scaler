@@ -92,6 +92,8 @@ class ZookeeperMixin:
             self.address = endpoint
         elif stage == "warming":
             endpoint = "WARMING"
+        elif stage == "cooling":
+            endpoint = "COOLING"
         else:
             raise ValueError(f"Invalid stage: {stage}")
 
@@ -160,7 +162,7 @@ class ZookeeperMixin:
                 f"Zookeeper entry {warming_model_path} deleted for warming model {self.model_id} ({self.model_name})"
             )
         else:
-            logger.warn(
+            logger.info(
                 f"Zookeeper entry {warming_model_path} not found for warming model {self.model_id} ({self.model_name})"
             )
 
@@ -191,7 +193,7 @@ class ZookeeperMixin:
                 f"Zookeeper entry {path} deleted for warming model {self.model_id} ({model_data.get('model_name', self.model_name)})"
             )
         else:
-            logger.warn(f"Zookeeper entry {path} not found")
+            logger.info(f"Zookeeper entry {path} not found")
 
     def unregister_active_model(self):
         """
@@ -217,7 +219,105 @@ class ZookeeperMixin:
                 logger.error(f"Error while deleting Zookeeper entry {path}: {str(e)}")
                 raise
         else:
-            logger.warn(f"Zookeeper entry {path} not found")
+            logger.info(f"Zookeeper entry {path} not found")
+
+    def register_cooling_model(self):
+        """
+        Determines the current state of the model and registers it as cooling.
+        Stores the original state for potential recovery.
+        Returns: The original state of the model ("active", "warming", or None)
+        """
+        try:
+            # Check if the model exists in either active or warming paths
+            active_path = f"/models/active/{self.model_id}"
+            warming_path = f"/models/warming/{self.model_id}"
+
+            # Store original state and data for recovery if needed
+            self.original_state = None
+            self.original_data = None
+
+            if self.kazoo_client.exists(active_path):
+                self.original_state = "active"
+                self.original_data = self.kazoo_client.get(active_path)[0]
+                logger.info(
+                    f"Found model {self.model_id} in active state, storing for recovery"
+                )
+            elif self.kazoo_client.exists(warming_path):
+                self.original_state = "warming"
+                self.original_data = self.kazoo_client.get(warming_path)[0]
+                logger.info(
+                    f"Found model {self.model_id} in warming state, storing for recovery"
+                )
+            else:
+                logger.info(
+                    f"Model {self.model_id} not found in active or warming state"
+                )
+
+            # Create cooling path
+            cooling_path = f"/models/cooling/{self.model_id}"
+            self.kazoo_client.ensure_path(cooling_path)
+            zk_data = self._create_zk_data("cooling")
+            self.kazoo_client.set(cooling_path, zk_data)
+            logger.info(
+                f"Zookeeper is tracking cooling model {self.model_id} ({self.model_name}) at {cooling_path}"
+            )
+
+            return self.original_state
+        except Exception as e:
+            logger.error(
+                f"Failed to register cooling model {self.model_id} ({self.model_name}): {str(e)}"
+            )
+            raise
+
+    def unregister_cooling_model(self):
+        """
+        Unregisters the model from Zookeeper under the /models/cooling path.
+        """
+        path = f"/models/cooling/{self.model_id}"
+        if self.kazoo_client.exists(path):
+            model_data = self._get_zk_data(path)
+            self.kazoo_client.delete(path)
+            logger.info(
+                f"Zookeeper entry {path} deleted for cooling model {self.model_id} ({model_data.get('model_name', self.model_name) if model_data else self.model_name})"
+            )
+        else:
+            logger.info(f"Zookeeper entry {path} not found")
+
+    def restore_original_state(self):
+        """
+        Restores the model to its original state if an operation fails.
+        Returns: True if restoration succeeded, False otherwise
+        """
+        if (
+            not hasattr(self, "original_state")
+            or not self.original_state
+            or not self.original_data
+        ):
+            logger.info(f"No original state found for model {self.model_id} to restore")
+            return False
+
+        # First remove from cooling path
+        self.unregister_cooling_model()
+
+        # Restore to original state
+        try:
+            if self.original_state == "active":
+                path = f"/models/active/{self.model_id}"
+                self.kazoo_client.ensure_path(path)
+                self.kazoo_client.set(path, self.original_data)
+                logger.info(f"Restored model {self.model_id} to active state")
+            elif self.original_state == "warming":
+                path = f"/models/warming/{self.model_id}"
+                self.kazoo_client.ensure_path(path)
+                self.kazoo_client.set(path, self.original_data)
+                logger.info(f"Restored model {self.model_id} to warming state")
+
+            return True
+        except Exception as e:
+            logger.error(
+                f"Failed to restore model {self.model_id} to original state: {str(e)}"
+            )
+            return False
 
     def get_model_endpoint(self, model_id):
         """

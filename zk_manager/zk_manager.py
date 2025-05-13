@@ -114,6 +114,7 @@ class ZKManager:
         return {
             "warming": self.get_model_info("/models/warming"),
             "active": self.get_model_info("/models/active"),
+            "cooling": self.get_model_info("/models/cooling"),
         }
 
     def delete_model(self, model_id: str, status: str) -> bool:
