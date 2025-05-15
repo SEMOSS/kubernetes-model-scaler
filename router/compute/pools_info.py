@@ -221,9 +221,9 @@ async def get_pools_info():
                     # Extract resources into their own model
                     resources_dict = model_info.pop("resources", {})
                     resources = ModelResources(
-                        cpu=resources_dict.get("cpu", 0),
-                        memory_gi=resources_dict.get("memory_gi", 0),
-                        gpu=resources_dict.get("gpu", 0),
+                        cpu=resources_dict.get("cpu_requests", 0),
+                        memory_gi=resources_dict.get("memory_requests_gi", 0),
+                        gpu=resources_dict.get("gpu_requests", 0),
                     )
                     # Create the model with separated resources
                     models_list.append(
