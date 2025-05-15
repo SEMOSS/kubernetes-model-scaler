@@ -7,4 +7,4 @@ class ModelRequest(BaseModel):
     model: str  # SEMOSS Short name for the model
     model_type: str  # Model Type
 
-    model_config = {"protected_namespaces": ()}
+    # model_config = {"protected_namespaces": ()}

@@ -5,6 +5,22 @@ from google.cloud import storage
 from google.oauth2.service_account import Credentials
 from fastapi import HTTPException
 from config.config import RESOURCE_BUCKET_NAME, IS_DEV
+from pydantic import BaseModel, Field, ValidationError
+from typing import Dict
+import yaml
+
+
+class _Meta(BaseModel):
+    name: str = Field(..., description="Kubernetes object name")
+
+
+class InferenceServiceManifest(BaseModel):
+    apiVersion: str
+    kind: str
+    metadata: _Meta
+
+    class Config:
+        extra = "allow"
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +43,7 @@ class StorageManager:
         self.bucket_name = RESOURCE_BUCKET_NAME
         self.client = self._initialize_client()
         self.bucket = self.client.bucket(self.bucket_name)
+        self.model_configs: Dict[str, InferenceServiceManifest] = {}
 
     def _initialize_client(self):
         """
@@ -129,3 +146,30 @@ class StorageManager:
                 status_code=500,
                 detail=f"Failed to download node pool config from GCS: {str(e)}",
             )
+
+    def reload_model_configs(self) -> None:
+        """Fetch every *.yaml (except node_pools.json) and rebuild the cache."""
+        new_cache: Dict[str, dict] = {}
+
+        for blob in self.bucket.list_blobs():
+            if blob.name == "node_pools.json" or not blob.name.endswith(".yaml"):
+                continue
+
+            raw = blob.download_as_bytes()
+            try:
+                manifest_dict = yaml.safe_load(raw)
+                manifest = InferenceServiceManifest.model_validate(manifest_dict)
+            except ValidationError as exc:
+                logger.error("Skipping bad YAML %s: %s", blob.name, exc)
+                continue
+            except yaml.YAMLError as exc:
+                logger.error("Skipping unreadable YAML %s: %s", blob.name, exc)
+                continue
+
+            new_cache[manifest.metadata.name] = manifest_dict
+
+        self.model_configs = new_cache
+        logger.info("Loaded %d model configs into cache", len(new_cache))
+
+    def get_model_deployments_config(self):
+        return self.model_configs

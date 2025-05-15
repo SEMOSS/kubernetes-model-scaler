@@ -15,12 +15,19 @@ from router.destroy_daemon_set_route import destroy_daemon_set_router
 from router.start_route_v2 import start_router_v2
 from router.stop_route_v2 import stop_router_v2
 from router.compute.pools_info import pools_info_router
+from router.model_deploy_configs_route import model_deployment_configs_router
+from cloud.gcp.storage.storage_manager import StorageManager
+
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    storage_manager = StorageManager()
+    storage_manager.reload_model_configs()
+    app.state.deployment_configs = storage_manager.get_model_deployments_config()
+
     is_dev = os.getenv("IS_DEV", "false").lower() == "true"
     if not is_dev:
         logger.info("Starting application and registering with Zookeeper...")
@@ -45,6 +52,7 @@ app.include_router(version_router, prefix="/api")
 app.include_router(instance_check_router, prefix="/api")
 # Get Node Pool Information
 app.include_router(pools_info_router, prefix="/api/resources")
+app.include_router(model_deployment_configs_router, prefix="/api/resources")
 
 
 app.include_router(shutdown_lock_router, prefix="/api")
