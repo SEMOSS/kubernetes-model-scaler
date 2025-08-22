@@ -6,25 +6,41 @@ logger = logging.getLogger(__name__)
 
 
 class KServeMixin:
-    def wait_for_model_ready(self):
+    def wait_for_model_ready(self) -> bool:
         """
-        Check if the model is ready for inference by directly pinging the health endpoint.
+        Check if the model is ready for inference by directly pinging the health endpoint using the external IP.
         Returns:
             bool: True if model is ready, False otherwise
         """
         logger.info("Waiting for InferenceService to be ready...")
         model_name = self.model_name
 
-        timeout = 1200  # 20 minutes
-        polling_interval = 10
+        timeout = 500
+        polling_interval = 5
         start_time = time.time()
 
+        failed_lb_ip_acquisition_count = 0
+
         while time.time() - start_time < timeout:
-            if self.check_model_health_endpoint():
-                logger.info(
-                    f"Model {model_name} is ready according to health endpoint check"
+            lb_ip = self.get_load_balancer_ip(wait=True)
+
+            if not lb_ip:
+                logger.warning(
+                    "LoadBalancer IP is not available for model health check..."
                 )
-                return True
+                failed_lb_ip_acquisition_count += 1
+
+                if failed_lb_ip_acquisition_count > 3:
+                    logger.warning(
+                        "Failed to acquire LoadBalancer IP multiple times, stopping health checks."
+                    )
+                    return False
+            else:
+                if self.check_model_health_endpoint(lb_ip):
+                    logger.info(
+                        f"Model {model_name} is ready according to health endpoint check"
+                    )
+                    return True
 
             time.sleep(polling_interval)
 
@@ -33,21 +49,20 @@ class KServeMixin:
         )
         return False
 
-    def check_model_health_endpoint(self):
+    def check_model_health_endpoint(self, lb_ip: str) -> bool:
         """
         Directly check the model's health/ready endpoint.
         Returns:
             bool: True if the health endpoint returns a successful response, False otherwise
         """
 
-        lb_ip = self.get_load_balancer_ip(wait=True)
-
-        logger.info(f"Checking LoadBalancer External IP: {lb_ip}")
-
         endpoint = f"http://{lb_ip}:80/v2/health/ready"
 
+        logger.info(
+            f"Using load balancer external IP to check model health at: {endpoint}"
+        )
+
         try:
-            logger.info(f"Checking health endpoint: {endpoint}")
             response = requests.get(endpoint, timeout=5)
 
             if response.status_code < 400:
@@ -63,5 +78,5 @@ class KServeMixin:
         except requests.RequestException as e:
             logger.warning(f"Failed to connect to health endpoint {endpoint}: {e}")
 
-        logger.info("All health endpoint checks failed")
+        logger.info("Model health endpoint check failed..")
         return False
