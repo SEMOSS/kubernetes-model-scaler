@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from contextlib import contextmanager
 from fastapi import APIRouter
 from pydantic_models.models import ModelRequest
@@ -90,50 +91,53 @@ def cleanup_deployment(deployer, completed_steps):
 
 @start_router_v2.post("/start")
 async def start_model(request: ModelRequest):
-    logger.info(
-        f"Received request to deploy model {request.model} with an ID {request.model_id}, "
-        f"a repo ID of {request.model_repo_id} and a type of {request.model_type}."
-    )
+    def blocking_deployment():
+        logger.info(
+            f"Received request to deploy model {request.model} with an ID {request.model_id}, "
+            f"a repo ID of {request.model_repo_id} and a type of {request.model_type}."
+        )
 
-    deployer = Deployer(
-        model=request.model,
-        model_id=request.model_id,
-        model_repo_id=request.model_repo_id,
-        model_type=request.model_type,
-        operation="deploy",
-    )
+        deployer = Deployer(
+            model=request.model,
+            model_id=request.model_id,
+            model_repo_id=request.model_repo_id,
+            model_type=request.model_type,
+            operation="deploy",
+        )
 
-    # Using context manager to handle failures
-    with deployment_manager(deployer) as deployment_steps:
-        # Register the model as warming
-        deployer.register_warming_model()
-        deployment_steps["warming_registered"] = True
+        # Using context manager to handle failures
+        with deployment_manager(deployer) as deployment_steps:
+            # Register the model as warming
+            deployer.register_warming_model()
+            deployment_steps["warming_registered"] = True
 
-        # Deploy the model with kserve
-        deployer.apply_yaml()
-        deployment_steps["yaml_applied"] = True
+            # Deploy the model with kserve
+            deployer.apply_yaml()
+            deployment_steps["yaml_applied"] = True
 
-        # Create the LoadBalancer
-        deployer.create_load_balancer()
-        deployment_steps["load_balancer_created"] = True
+            # Create the LoadBalancer
+            deployer.create_load_balancer()
+            deployment_steps["load_balancer_created"] = True
 
-        # Create the ExternalName service
-        # deployer.create_external_name_service()
-        # deployment_steps["external_name_created"] = True
+            # Create the ExternalName service
+            # deployer.create_external_name_service()
+            # deployment_steps["external_name_created"] = True
 
-        # # Create the Ingress
-        # deployer.create_ingress()
-        # deployment_steps["ingress_created"] = True
+            # # Create the Ingress
+            # deployer.create_ingress()
+            # deployment_steps["ingress_created"] = True
 
-        # Wait for the inference service to be ready
-        model_ready = deployer.wait_for_model_ready()
-        if not model_ready:
-            logger.warning(
-                f"Model {request.model} deployment completed but model is not ready for inference"
-            )
+            # Wait for the inference service to be ready
+            model_ready = deployer.wait_for_model_ready()
+            if not model_ready:
+                logger.warning(
+                    f"Model {request.model} deployment completed but model is not ready for inference"
+                )
 
-        # Register the model as active
-        deployer.register_active_model()
-        deployment_steps["active_registered"] = True
+            # Register the model as active
+            deployer.register_active_model()
+            deployment_steps["active_registered"] = True
 
-        return {"message": "Model deployment started successfully"}
+            return {"message": "Model deployment started successfully"}
+
+    return await asyncio.to_thread(blocking_deployment)
